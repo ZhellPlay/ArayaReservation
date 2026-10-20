@@ -1,8 +1,9 @@
+// Utilitas bersama user & admin
 export const TZ = "+08:00"; // WITA (Kalimantan Selatan)
 const H = 3600000;
 
 /* ---------- aman dari XSS ---------- */
-export const esc = s => String(s ?? "").replace(/[&<>\"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+export const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 export const debounce = (fn, ms = 250) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
@@ -103,8 +104,8 @@ export const DEFAULT_SETTINGS = {
     dpPercent: 50, holdMinutes: 30, bufferMin: 0, noShowGraceMin: 15, pendingTtlHours: 24, minLeadMin: 15, maxDurasi: 12,
     adminWA: "", holidays: [], policy: "DP hangus jika batal setelah pembayaran atau tidak datang.",
     templates: {
-        approve: "Halo {nama} 👋\nBooking kamu di ARAYA GAMESTATION {lokasi} ({room}) pada {tanggal}, jam {jam} sudah DISETUJUI ✅\n\nSilakan bayar DP {nominal} sebelum {deadline}, lalu upload\n{link}",
-        approveCash: "Halo {nama} 👋\nBooking kamu di ARAYA GAMESTATION {lokasi} ({room}) pada {tanggal}, jam {jam} sudah DISETUJUI ✅\n\nDP {nominal} dibayar TUNAI di tempat sebelum {deadline}.",
+        approve: "Halo {nama} 👋\nBooking kamu di ARAYA GAMESTATION {lokasi} ({room}) pada {tanggal}, jam {jam} sudah DISETUJUI ✅\n\nSilakan bayar DP {nominal} sebelum {deadline}, lalu upload bukti di link ini:\n{link}\n\nKode booking: {kode}",
+        approveCash: "Halo {nama} 👋\nBooking kamu di ARAYA GAMESTATION {lokasi} ({room}) pada {tanggal}, jam {jam} sudah DISETUJUI ✅\n\nDP {nominal} dibayar TUNAI di tempat sebelum {deadline}.\nDetail booking: {link}\n\nKode booking: {kode}",
         reject: "Halo {nama}, mohon maaf booking kamu ({room}, {tanggal} {jam}) belum bisa kami proses.\nAlasan: {alasan}\nKamu bisa booking ulang di jam lain: {site}",
         remind: "Halo {nama}, pengingat: DP {nominal} untuk booking {room} ({tanggal} {jam}) belum kami terima. Batas bayar {deadline}.\n{link}",
         confirmed: "Halo {nama}, pembayaran DP sudah kami terima ✅\nSampai jumpa {tanggal} jam {jam} di {lokasi} ({room}). Tunjukkan QR di link ini saat datang:\n{link}\nKode: {kode}"
@@ -123,7 +124,7 @@ export function calcPrice(st, room, durasi, orang, mic) {
     const extraN = Math.max(0, orang - (room.baseCap || 0));
     const base = (room.rate || 0) * durasi, extra = extraN * (room.extraPrice || 0) * mult, micT = (mic || 0) * (st.micPrice || 0) * mult;
     const total = base + extra + micT;
-    const dp = total > 0 ? Math.floor((total * (st.dpPercent || 50)) / 100 / 1000) * 1000 : 0;
+    const dp = total > 0 ? Math.ceil(total * (st.dpPercent || 50) / 100 / 1000) * 1000 : 0;
     return { base, extraN, extra, micT, total, dp };
 }
 
@@ -152,7 +153,7 @@ export function modal(html, { sticky = false } = {}) {
 export function confirmBox(title, msg, ok = "Ya", danger = false) {
     return new Promise(res => {
         const m = modal(`<div class="modal-icon"><span class="material-icons-round">${danger ? "warning" : "help"}</span></div><h3>${esc(title)}</h3><p>${esc(msg)}</p>
-        <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn ${danger ? "btn-delete" : "btn-save"}" id="cbOk" style="flex:0 0 auto;padding:12px 22px;">${esc(ok)}</button></div>`);
+        <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn ${danger ? "btn-delete" : "btn-save"}" id="cbOk" style="flex:0 0 auto;padding:12px 22px">${esc(ok)}</button></div>`, { sticky: true });
         $$("[data-close]", m.el).forEach(b => b.addEventListener("click", () => res(false)));
         $("#cbOk", m.el).addEventListener("click", () => { m.close(); res(true); });
     });
@@ -189,7 +190,7 @@ export function startBackground() {
     addEventListener("resize", resize); resize();
     addEventListener("mousemove", e => { mx = e.clientX; my = e.clientY; });
     const sy = ["\u25B3", "\u25CB", "\u2715", "\u25A1"], co = ["#8b5cf6", "#ec4899", "#3b82f6", "#10b981"], N = innerWidth < 600 ? 16 : 30;
-    const ps = Array.from({ length: N }, (_, i) => ({ x: Math.random() * W, y: Math.random() * H2, vx: (Math.random() - .5) * .5, vy: (Math.random() - .5) * .5, size: Math.random() * 24 + 16, alp[...]
+    const ps = Array.from({ length: N }, (_, i) => ({ x: Math.random() * W, y: Math.random() * H2, vx: (Math.random() - .5) * .5, vy: (Math.random() - .5) * .5, size: Math.random() * 24 + 16, alpha: Math.random() * .25 + .2, rot: Math.random() * 6.28, rs: (Math.random() - .5) * .012, sym: sy[i % 4], color: co[i % 4] }));
     (function draw() {
         cx.clearRect(0, 0, W, H2);
         let g = cx.createRadialGradient(W * .25, H2 * .2, 0, W * .25, H2 * .2, W * .7); g.addColorStop(0, "rgba(139,92,246,0.07)"); g.addColorStop(1, "transparent"); cx.fillStyle = g; cx.fillRect(0, 0, W, H2);
