@@ -1,66 +1,23 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Araya Reservation</title>
-  <link rel="stylesheet" href="css/theme.css">
-  <link rel="stylesheet" href="css/app.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <meta name="referrer" content="no-referrer">
+    <title>ARAYA GAMESTATION RESERVATION</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-
-  <div class="container">
-    <div class="card payment-section">
-      <h2>Detail Pembayaran</h2>
-      <div id="payment-nominal" class="payment-amount">Rp 0</div>
-      <p id="payment-instructions" class="payment-info"></p>
-      
-      <div class="btn-group">
-        <button class="btn" onclick="alert('Bukti diunggah')">Unggah Bukti Pembayaran</button>
-        <button class="btn" style="background-color: var(--color-text-muted);">Batal</button>
-      </div>
+    <canvas id="bgCanvas"></canvas>
+    <div class="app narrow">
+        <div class="header"><a href="#/" style="text-decoration:none"><h1>ARAYA GAMESTATION RESERVATION</h1></a></div>
+        <main id="view"></main>
     </div>
-
-    <div class="card">
-      <h2>Informasi Reservasi</h2>
-      <div class="accordion-wrapper" style="margin-top: var(--space-md);">
-        
-        <div class="accordion-item">
-          <button class="accordion-header">
-            Fasilitas
-            <svg class="accordion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
-          <div class="accordion-content">
-            <div class="accordion-body">
-              Detail fasilitas akan tampil di sini sesuai dengan paket yang dipilih.
-            </div>
-          </div>
-        </div>
-
-        <div class="accordion-item">
-          <button class="accordion-header">
-            Syarat & Ketentuan
-            <svg class="accordion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
-          <div class="accordion-content">
-            <div class="accordion-body">
-              Kebijakan pembatalan dan ketentuan reservasi lengkap.
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <script src="js/qris.js"></script>
-  <script src="js/user.js"></script>
-  <script>
-    PaymentManager.init(50000);
-  </script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+    <script type="module" src="js/user.js"></script>
 </body>
 </html>
