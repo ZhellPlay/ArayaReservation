@@ -1,22 +1,77 @@
 :root {
     --bg-primary: #0a0a12;
     --bg-card: rgba(255, 255, 255, 0.04);
-    --bg-input: rgba(255, 255, 255, 0.06);
+    --bg-input: rgba(0, 0, 0, 0.3);
+    --bg-elevated: rgba(255, 255, 255, 0.06);
+    --bg-hover: rgba(255, 255, 255, 0.12);
+    --bg-overlay: rgba(0, 0, 0, 0.7);
+
     --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-medium: rgba(255, 255, 255, 0.16);
     --border-glow: rgba(139, 92, 246, 0.5);
+
     --text-primary: #f1f1f4;
-    --text-secondary: rgba(255, 255, 255, 0.5);
+    --text-secondary: rgba(255, 255, 255, 0.55);
+    --text-muted: rgba(255, 255, 255, 0.35);
+
     --accent-1: #8b5cf6;
     --accent-2: #ec4899;
     --accent-gradient: linear-gradient(135deg, #8b5cf6, #ec4899);
+    --accent-soft: rgba(139, 92, 246, 0.15);
+    --accent-border: rgba(139, 92, 246, 0.25);
+
     --success: #10b981;
+    --success-soft: rgba(16, 185, 129, 0.15);
+    --success-border: rgba(16, 185, 129, 0.3);
     --danger: #ef4444;
-    --radius: 16px;
-    --radius-sm: 12px;
-    --radius-xs: 8px;
+    --danger-soft: rgba(239, 68, 68, 0.15);
+    --danger-border: rgba(239, 68, 68, 0.3);
+    --warning: #f59e0b;
+    --warning-soft: rgba(245, 158, 11, 0.15);
+    --warning-border: rgba(245, 158, 11, 0.3);
+    --info: #3b82f6;
+
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+    --radius-pill: 100px;
+
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+    --space-2xl: 32px;
+
     --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
     --shadow-glow: 0 0 40px rgba(139, 92, 246, 0.15);
+    --shadow-toast: 0 12px 40px rgba(0, 0, 0, 0.5);
+
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.15s ease;
+
+    --font-body: 'Rajdhani', sans-serif;
+    --font-display: 'Orbitron', sans-serif;
+
+    --app-narrow: 640px;
+    --app-wide: 1180px;
+    --app-padding-x: 20px;
+    --app-padding-y: 24px;
+
+    --btn-padding-y: 12px;
+    --btn-padding-x: 20px;
+    --btn-font-size: 13px;
+    --btn-gap: 8px;
+
+    --input-padding-y: 12px;
+    --input-padding-x: 14px;
+    --input-font-size: 14px;
+
+    --header-h1-min: 22px;
+    --header-h1-max: 32px;
+
+    --card-min-w: 320px;
+    --room-min-w: 260px;
 }
 
 * {
@@ -26,7 +81,7 @@
 }
 
 body {
-    font-family: 'Rajdhani', sans-serif;
+    font-family: var(--font-body);
     background: var(--bg-primary);
     color: var(--text-primary);
     min-height: 100vh;
@@ -58,19 +113,19 @@ body::-webkit-scrollbar {
     z-index: 1;
     max-width: 1100px;
     margin: 0 auto;
-    padding: 24px 20px 60px;
+    padding: var(--app-padding-y) var(--app-padding-x) 60px;
 }
 
 .header {
     text-align: center;
-    margin-bottom: 32px;
-    padding: 28px 20px;
+    margin-bottom: var(--space-2xl);
+    padding: var(--space-xl) var(--space-lg);
     animation: pageSlideIn 0.7s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .header h1 {
-    font-family: 'Orbitron', sans-serif;
-    font-size: clamp(22px, 5vw, 32px);
+    font-family: var(--font-display);
+    font-size: clamp(var(--header-h1-min), 5vw, var(--header-h1-max));
     font-weight: 800;
     background: var(--accent-gradient);
     -webkit-background-clip: text;
@@ -99,17 +154,17 @@ body::-webkit-scrollbar {
     background: var(--bg-card);
     border: 1px solid var(--border-subtle);
     border-left: 3px solid var(--accent-1);
-    padding: 28px 24px;
+    padding: var(--space-xl);
     box-shadow: var(--shadow-card);
     backdrop-filter: blur(20px);
-    margin-bottom: 24px;
+    margin-bottom: var(--space-xl);
     transition: var(--transition);
     clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
     animation: pageSlideIn 0.8s 0.1s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .form-card:hover {
-    border-color: rgba(139, 92, 246, 0.25);
+    border-color: var(--accent-border);
     filter: drop-shadow(var(--shadow-card)) drop-shadow(var(--shadow-glow));
 }
 
@@ -122,7 +177,7 @@ body::-webkit-scrollbar {
     font-weight: 700;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-md);
     user-select: none;
 }
 
@@ -141,7 +196,7 @@ body::-webkit-scrollbar {
 .form-collapsible.active {
     max-height: 2000px;
     opacity: 1;
-    margin-top: 24px;
+    margin-top: var(--space-xl);
 }
 
 #toggleIcon {
@@ -157,17 +212,17 @@ body::-webkit-scrollbar {
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
-}
-
-.form-group.full-width {
-    grid-column: 1 / -1;
+    gap: var(--space-lg);
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-sm);
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
 }
 
 .form-group label {
@@ -186,14 +241,14 @@ input,
 select,
 textarea {
     width: 100%;
-    padding: 12px 14px;
+    padding: var(--input-padding-y) var(--input-padding-x);
     border-radius: 0;
     border: 1px solid var(--border-subtle);
     border-left: 2px solid var(--accent-1);
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--bg-input);
     color: var(--text-primary);
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 14px;
+    font-family: var(--font-body);
+    font-size: var(--input-font-size);
     transition: var(--transition);
     -webkit-appearance: none;
 }
@@ -202,7 +257,7 @@ select {
     cursor: pointer;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 14px center;
+    background-position: right var(--input-padding-x) center;
     padding-right: 36px;
 }
 
@@ -243,7 +298,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
     align-items: center;
     border: 1px solid var(--border-subtle);
     border-left: 2px solid var(--accent-1);
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--bg-input);
     overflow: hidden;
     transition: var(--transition);
 }
@@ -270,7 +325,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stepper-btn:hover {
-    background: rgba(139, 92, 246, 0.15);
+    background: var(--accent-soft);
     color: var(--accent-1);
 }
 
@@ -279,7 +334,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
     box-shadow: none;
     background: transparent;
     text-align: center;
-    padding: 12px 4px;
+    padding: var(--input-padding-y) var(--space-xs);
     flex: 1;
     min-width: 0;
 }
@@ -298,12 +353,12 @@ input[type="number"] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 12px 20px;
+    gap: var(--btn-gap);
+    padding: var(--btn-padding-y) var(--btn-padding-x);
     border: none;
     cursor: pointer;
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 13px;
+    font-family: var(--font-body);
+    font-size: var(--btn-font-size);
     font-weight: 600;
     transition: var(--transition);
     position: relative;
@@ -315,7 +370,7 @@ input[type="number"] {
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(255, 255, 255, 0);
+    background: transparent;
     transition: var(--transition);
 }
 
@@ -329,8 +384,8 @@ input[type="number"] {
 
 .form-actions {
     display: flex;
-    gap: 12px;
-    margin-top: 16px;
+    gap: var(--space-md);
+    margin-top: var(--space-lg);
 }
 
 .btn-save {
@@ -350,11 +405,11 @@ input[type="number"] {
     display: none;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    background: rgba(239, 68, 68, 0.12);
+    gap: var(--btn-gap);
+    background: var(--danger-soft);
     color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    padding: 14px 24px;
+    border: 1px solid var(--danger-border);
+    padding: 14px var(--space-xl);
     font-size: 14px;
     font-weight: 700;
     transition: var(--transition);
@@ -370,10 +425,10 @@ input[type="number"] {
 }
 
 .btn-edit {
-    background: rgba(139, 92, 246, 0.15);
+    background: var(--accent-soft);
     color: var(--accent-1);
-    border: 1px solid rgba(139, 92, 246, 0.25);
-    padding: 8px 16px;
+    border: 1px solid var(--accent-border);
+    padding: var(--space-sm) var(--space-lg);
 }
 
 .btn-edit:hover {
@@ -381,10 +436,10 @@ input[type="number"] {
 }
 
 .btn-delete {
-    background: rgba(239, 68, 68, 0.12);
+    background: var(--danger-soft);
     color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    padding: 8px 16px;
+    border: 1px solid var(--danger-border);
+    padding: var(--space-sm) var(--space-lg);
 }
 
 .btn-delete:hover {
@@ -395,7 +450,9 @@ input[type="number"] {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 20px;
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+    flex-wrap: wrap;
     animation: pageSlideIn 0.8s 0.2s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
@@ -404,7 +461,7 @@ input[type="number"] {
     font-weight: 700;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-md);
 }
 
 .section-title .material-icons-round {
@@ -413,13 +470,13 @@ input[type="number"] {
 }
 
 .count-badge {
-    background: rgba(139, 92, 246, 0.15);
+    background: var(--accent-soft);
     color: var(--accent-1);
     font-size: 12px;
     font-weight: 700;
-    padding: 4px 12px;
-    border-radius: 100px;
-    border: 1px solid rgba(139, 92, 246, 0.2);
+    padding: var(--space-xs) var(--space-md);
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--accent-border);
 }
 
 .count-badge.pop {
@@ -428,15 +485,15 @@ input[type="number"] {
 
 .booking-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(var(--card-min-w), 1fr));
+    gap: var(--space-lg);
 }
 
 .booking-card {
     background: var(--bg-card);
     border: 1px solid var(--border-subtle);
     border-left: 3px solid var(--accent-2);
-    padding: 20px;
+    padding: var(--space-xl);
     backdrop-filter: blur(20px);
     transition: var(--transition);
     animation: cardIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
@@ -445,7 +502,7 @@ input[type="number"] {
 }
 
 .booking-card:hover {
-    border-color: rgba(139, 92, 246, 0.2);
+    border-color: var(--accent-border);
     filter: drop-shadow(var(--shadow-card)) drop-shadow(0 0 15px rgba(139, 92, 246, 0.2));
     transform: translateY(-2px);
 }
@@ -454,11 +511,12 @@ input[type="number"] {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 14px;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
 }
 
 .booking-card-header h3 {
-    font-family: 'Orbitron', sans-serif;
+    font-family: var(--font-display);
     font-size: 16px;
     letter-spacing: 1px;
     color: #fff;
@@ -470,17 +528,17 @@ input[type="number"] {
     font-weight: 700;
     letter-spacing: 0.8px;
     text-transform: uppercase;
-    padding: 4px 10px 4px 20px;
-    border-radius: 100px;
-    background: rgba(16, 185, 129, 0.12);
+    padding: var(--space-xs) 10px var(--space-xs) 20px;
+    border-radius: var(--radius-pill);
+    background: var(--success-soft);
     color: var(--success);
-    border: 1px solid rgba(16, 185, 129, 0.2);
+    border: 1px solid var(--success-border);
 }
 
 .status-badge::before {
     content: "";
     position: absolute;
-    left: 8px;
+    left: var(--space-sm);
     top: 50%;
     transform: translateY(-50%);
     width: 6px;
@@ -493,7 +551,7 @@ input[type="number"] {
 .status-badge::after {
     content: "";
     position: absolute;
-    left: 8px;
+    left: var(--space-sm);
     top: 50%;
     transform: translateY(-50%);
     width: 6px;
@@ -505,18 +563,18 @@ input[type="number"] {
 .booking-details {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
 }
 
 .detail-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
     font-size: 13px;
     color: var(--text-secondary);
-    border-radius: 8px;
-    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    padding: var(--space-xs) 6px;
     margin: -4px -6px;
     transition: background 0.2s ease;
 }
@@ -548,40 +606,40 @@ input[type="number"] {
 .divider {
     height: 1px;
     background: var(--border-subtle);
-    margin-bottom: 14px;
+    margin-bottom: var(--space-lg);
 }
 
 .action-buttons {
     display: flex;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .empty-state {
     text-align: center;
-    padding: 60px 20px;
+    padding: 60px var(--space-lg);
     color: var(--text-secondary);
 }
 
 .empty-state .material-icons-round {
     font-size: 48px;
-    margin-bottom: 12px;
+    margin-bottom: var(--space-md);
     opacity: 0.3;
 }
 
 .toast {
     position: fixed;
-    top: 20px;
-    right: 20px;
+    top: var(--space-xl);
+    right: var(--space-xl);
     min-width: 280px;
-    padding: 14px 20px;
+    padding: 14px var(--space-xl);
     color: white;
-    font-family: 'Rajdhani', sans-serif;
+    font-family: var(--font-body);
     font-size: 13px;
     font-weight: 500;
     display: flex;
     align-items: center;
-    gap: 10px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    gap: var(--space-md);
+    box-shadow: var(--shadow-toast);
     animation: toastIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 9999;
     backdrop-filter: blur(20px);
@@ -590,17 +648,17 @@ input[type="number"] {
 
 .toast.success {
     background: rgba(16, 185, 129, 0.9);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    border: 1px solid var(--success-border);
 }
 
 .toast.error {
     background: rgba(239, 68, 68, 0.9);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    border: 1px solid var(--danger-border);
 }
 
 .toast.info {
     background: rgba(139, 92, 246, 0.9);
-    border: 1px solid rgba(139, 92, 246, 0.3);
+    border: 1px solid var(--accent-border);
 }
 
 .btn-loading {
@@ -634,7 +692,7 @@ input[type="number"] {
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--bg-overlay);
     backdrop-filter: blur(10px);
     z-index: 99999;
     display: flex;
@@ -643,6 +701,7 @@ input[type="number"] {
     opacity: 0;
     pointer-events: none;
     transition: var(--transition);
+    padding: var(--space-lg);
 }
 
 .modal-overlay.active {
@@ -655,13 +714,15 @@ input[type="number"] {
     border: 1px solid var(--border-subtle);
     border-top: 3px solid var(--danger);
     padding: 30px;
-    width: 90%;
-    max-width: 360px;
+    width: 100%;
+    max-width: 400px;
     text-align: center;
     filter: drop-shadow(var(--shadow-card));
     transform: scale(0.9) translateY(20px);
     transition: var(--transition);
     clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+    max-height: calc(100vh - var(--space-2xl));
+    overflow-y: auto;
 }
 
 .modal-overlay.active .modal-card {
@@ -672,13 +733,13 @@ input[type="number"] {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: rgba(239, 68, 68, 0.1);
+    background: var(--danger-soft);
     color: var(--danger);
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 20px;
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    margin: 0 auto var(--space-xl);
+    border: 1px solid var(--danger-border);
 }
 
 .modal-icon .material-icons-round {
@@ -688,19 +749,20 @@ input[type="number"] {
 .modal-card h3 {
     font-size: 20px;
     font-weight: 700;
-    margin-bottom: 10px;
+    margin-bottom: var(--space-md);
 }
 
 .modal-card p {
     font-size: 14px;
     color: var(--text-secondary);
-    margin-bottom: 24px;
+    margin-bottom: var(--space-xl);
     line-height: 1.5;
 }
 
 .modal-actions {
     display: flex;
-    gap: 12px;
+    gap: var(--space-md);
+    margin-top: var(--space-lg);
 }
 
 .modal-actions .btn {
@@ -708,177 +770,91 @@ input[type="number"] {
 }
 
 @keyframes spin {
-    to {
-        transform: translateY(-50%) rotate(360deg);
-    }
+    to { transform: translateY(-50%) rotate(360deg); }
 }
 
 @keyframes toastIn {
-    from {
-        transform: translateX(120%);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
+    from { transform: translateX(120%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes cardIn {
-    from {
-        opacity: 0;
-        transform: translateY(16px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes shimmer {
-    0% {
-        background-position: 200% center;
-    }
-
-    100% {
-        background-position: -200% center;
-    }
+    0% { background-position: 200% center; }
+    100% { background-position: -200% center; }
 }
 
 @keyframes pulseRing {
-    0% {
-        transform: translateY(-50%) scale(1);
-        opacity: 1;
-    }
-
-    100% {
-        transform: translateY(-50%) scale(2.2);
-        opacity: 0;
-    }
+    0% { transform: translateY(-50%) scale(1); opacity: 1; }
+    100% { transform: translateY(-50%) scale(2.2); opacity: 0; }
 }
 
 @keyframes badgePop {
-    0% {
-        transform: scale(1);
-    }
-
-    40% {
-        transform: scale(1.3);
-    }
-
-    70% {
-        transform: scale(0.9);
-    }
-
-    100% {
-        transform: scale(1);
-    }
+    0% { transform: scale(1); }
+    40% { transform: scale(1.3); }
+    70% { transform: scale(0.9); }
+    100% { transform: scale(1); }
 }
 
 @keyframes shake {
-
-    0%,
-    100% {
-        transform: translateX(0);
-    }
-
-    20%,
-    60% {
-        transform: translateX(-6px);
-    }
-
-    40%,
-    80% {
-        transform: translateX(6px);
-    }
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
 }
 
 @keyframes pageSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(24px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes labelGlow {
-    from {
-        color: var(--text-secondary);
-    }
-
-    to {
-        color: var(--accent-1);
-    }
+    from { color: var(--text-secondary); }
+    to { color: var(--accent-1); }
 }
 
 @keyframes rippleAnim {
-    to {
-        transform: scale(4);
-        opacity: 0;
-    }
+    to { transform: scale(4); opacity: 0; }
 }
 
-@media(max-width:900px) {
-    .dashboard-layout {
-        gap: 24px;
-    }
-
-    .form-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-    }
-
-    .booking-grid {
-        grid-template-columns: 1fr;
-    }
+@media (max-width: 900px) {
+    .dashboard-layout { gap: var(--space-xl); }
+    .form-grid { grid-template-columns: 1fr 1fr; gap: var(--space-md); }
+    .booking-grid { grid-template-columns: 1fr; }
 }
 
-@media(max-width:768px) {
-    .app {
-        padding: 16px 14px 40px;
-    }
-
-    .header {
-        padding: 20px 10px;
-        margin-bottom: 24px;
-    }
-
-    .form-card {
-        padding: 20px 16px;
-    }
-
-    .booking-details {
-        grid-template-columns: 1fr;
-    }
-
-    .section-header {
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .toast {
-        left: 14px;
-        right: 14px;
-        min-width: unset;
-    }
+@media (max-width: 768px) {
+    .app { padding: var(--space-lg) 14px 40px; }
+    .header { padding: var(--space-xl) 10px; margin-bottom: var(--space-xl); }
+    .form-card { padding: var(--space-xl) var(--space-lg); }
+    .booking-details { grid-template-columns: 1fr; }
+    .section-header { flex-wrap: wrap; gap: var(--space-md); }
+    .toast { left: 14px; right: 14px; min-width: unset; top: var(--space-md); }
+    .modal-card { padding: var(--space-xl); }
 }
 
-@media(max-width:480px) {
-    .form-grid {
-        grid-template-columns: 1fr;
-    }
+@media (max-width: 480px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .form-group.full-width { grid-column: auto; }
+    .header h1 { font-size: var(--header-h1-min); }
+    .booking-card { padding: var(--space-lg); }
+    .form-card { padding: var(--space-lg); }
+}
 
-    .form-group.full-width {
-        grid-column: auto;
-    }
-
-    .header h1 {
-        font-size: 22px;
-    }
+@media (orientation: landscape) and (max-height: 600px) {
+    .app { padding: var(--space-md) 14px 30px; }
+    .header { padding: var(--space-sm) 10px; margin-bottom: var(--space-md); }
+    .header h1 { font-size: 20px; }
+    .form-card { padding: var(--space-lg); margin-bottom: var(--space-md); }
+    .modal-card { padding: var(--space-lg); max-height: 92vh; }
+    .modal-icon { width: 44px; height: 44px; margin-bottom: var(--space-md); }
+    .modal-icon .material-icons-round { font-size: 24px; }
+    .toast { top: var(--space-sm); right: var(--space-sm); left: auto; min-width: 240px; }
+    .countdown { font-size: 28px; }
+    .nominal { font-size: 22px; }
+    .qr-box { width: min(180px, 30vw); margin: var(--space-sm) auto; }
+    .steps-intro { gap: var(--space-sm); }
 }
