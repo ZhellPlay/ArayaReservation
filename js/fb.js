@@ -4,12 +4,12 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/11.7.1/firebase
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
 
 const app = initializeApp({
-    apiKey: "AIzaSyDb_Kh4oanLB6JB9EAHNRgAj9doZ-bEjFM",
-    authDomain: "araya-booking-c7651.firebaseapp.com",
-    projectId: "araya-booking-c7651",
-    storageBucket: "araya-booking-c7651.firebasestorage.app",
-    messagingSenderId: "61938475795",
-    appId: "1:61938475795:web:948161570fe48fb20270e6"
+    apiKey: "AIzaSyCPK6T6zSkHtlATSWAlDsgU3oFP5ucPCU8",
+    authDomain: "booking-a77e4.firebaseapp.com",
+    projectId: "booking-a77e4",
+    storageBucket: "booking-a77e4.firebasestorage.app",
+    messagingSenderId: "80976845423",
+    appId: "1:80976845423:web:d2ab3226a98c5e55de0b9a"
 });
 
 export const db = getFirestore(app);
