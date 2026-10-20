@@ -2,18 +2,40 @@ import { db, doc, setDoc } from "./fb.js";
 import { $, $$, esc, parseNum, normWA, icon, compressImage, qrSvg, toast, rupiah, DEFAULT_SETTINGS } from "./lib.js";
 import { validateQris, decodeQrFromFile, makeDynamic } from "./qris.js";
 
-const roomRow = r => `<tr data-row><td><input data-f="name" value="${esc(r.name)}" style="min-width:110px"></td>
+const roomRow = r => `<tr data-row>
+  <td><input data-f="name" value="${esc(r.name)}" style="min-width:110px"></td>
   <td><input data-f="rate" inputmode="numeric" value="${r.rate || ""}" placeholder="0" style="width:90px"></td>
   <td><input data-f="baseCap" inputmode="numeric" value="${r.baseCap ?? 4}" style="width:60px"></td>
   <td><input data-f="maxCap" inputmode="numeric" value="${r.maxCap || ""}" placeholder="∞" style="width:60px"></td>
   <td><input data-f="extraPrice" inputmode="numeric" value="${r.extraPrice || ""}" placeholder="0" style="width:90px"></td>
-  <td><input type="checkbox" data-f="active" ${r.active === false ? "" : "checked"} style="width:20px"></td>
-  <td><button class="btn btn-ghost btn-sm" data-delrow type="button">${icon("delete", 14)}</button></td></tr>`;
+  <td><input type="checkbox" data-f="active" ${r.active === false ? "" : "checked"}></td>
+  <td><button class="btn btn-ghost btn-sm" data-delrow type="button">${icon("delete", 14)}</button></td>
+</tr>`;
+
+const lokBlock = (l, rms) => `<div class="lok-block" data-loksec="${esc(l)}">
+    <div class="lok-title">${icon("store", 20)} ${esc(l)}</div>
+    <h4 class="subsec-title">Room &amp; Tarif</h4>
+    <div class="scroll-x"><table class="tbl" data-lok="${esc(l)}">
+        <thead><tr><th>Room</th><th>Tarif/jam</th><th>Kapasitas</th><th>Maks</th><th>+Orang/jam</th><th>Aktif</th><th></th></tr></thead>
+        <tbody>${rms.map(roomRow).join("")}</tbody>
+    </table></div>
+    <button class="btn btn-ghost btn-sm" data-addroom="${esc(l)}" type="button">${icon("add", 14)} Tambah room</button>
+    <h4 class="subsec-title">QRIS ${esc(l)}</h4>
+    <p class="muted">Upload QRIS merchant cabang ini. Tersimpan otomatis.</p>
+    <div class="muted" data-qinfo="${esc(l)}"></div>
+    <div data-qprev="${esc(l)}"></div>
+    <input type="file" accept="image/*" data-qfile="${esc(l)}" style="margin-top:8px">
+    <div class="row-btns"><button class="btn btn-delete btn-sm" data-qdel="${esc(l)}" type="button">${icon("delete", 14)} Hapus QRIS</button></div>
+    <div class="row-btns" style="margin-top:14px;border-top:1px dashed var(--border-subtle);padding-top:14px">
+        <button class="btn btn-delete btn-sm" data-removelok="${esc(l)}" type="button">${icon("delete_forever", 14)} Hapus cabang "${esc(l)}"</button>
+    </div>
+</div>`;
 
 export function renderSettings(el, S, H) {
-    const st = S.st; let hol = [...(st.holidays || [])];
+    const st = S.st;
+    let hol = [...(st.holidays || [])];
     const num = (id, v, label, hint = "") => `<div class="form-group"><label>${label}</label><input id="${id}" inputmode="decimal" value="${v ?? ""}">${hint ? `<small class="hint">${hint}</small>` : ""}</div>`;
-    const scopes = ["DEFAULT", ...st.lokasi];
+
     el.innerHTML = `
     <div class="form-card"><details open class="set-sec"><summary>${icon("tune")} Umum &amp; Kebijakan</summary><div class="form-grid">
       ${num("sDp", st.dpPercent, "DP default (%)")}${num("sHold", st.holdMinutes, "Batas bayar (menit)", "Setelah disetujui, slot ditahan sampai batas ini.")}
@@ -21,12 +43,16 @@ export function renderSettings(el, S, H) {
       ${num("sTtl", st.pendingTtlHours, "Permintaan kedaluwarsa (jam)")}${num("sLead", st.minLeadMin, "Minimal booking sebelum main (menit)")}
       ${num("sMaxD", st.maxDurasi, "Durasi maksimal (jam)")}${num("sMic", st.micPrice, "Harga mic tambahan (Rp)")}
       <div class="form-group full-width"><label class="check"><input type="checkbox" id="sPerHour" ${st.addonPerHour ? "checked" : ""}><span>Biaya orang tambahan &amp; mic dihitung <b>per jam</b> (tidak dicentang = sekali bayar)</span></label></div>
-      <div class="form-group full-width"><label>WhatsApp admin (untuk tombol "Hubungi admin" di sisi pelanggan)</label><input id="sWa" inputmode="tel" value="${esc(st.adminWA || "")}" placeholder="08xxxxxxxxxx"></div>
+      <div class="form-group full-width"><label>WhatsApp admin</label><input id="sWa" inputmode="tel" value="${esc(st.adminWA || "")}" placeholder="08xxxxxxxxxx"></div>
       <div class="form-group full-width"><label>Kebijakan (tampil di halaman booking)</label><textarea id="sPolicy" rows="2">${esc(st.policy || "")}</textarea></div></div></details></div>
 
-    <div class="form-card"><details open class="set-sec"><summary>${icon("meeting_room")} Room &amp; Tarif</summary>
-      <p class="muted">Tarif per jam. Kapasitas dasar = jumlah orang yang sudah termasuk tarif. Lebih dari itu dihitung "orang tambahan". Mengganti nama room tidak mengubah booking lama.</p>
-      ${st.lokasi.map(l => `<h3 style="margin-top:14px">${esc(l)}</h3><div class="scroll-x"><table class="tbl" data-lok="${esc(l)}"><thead><tr><th>Room</th><th>Tarif/jam</th><th>Kapasitas</th><th>Maks</th><th>+Orang/jam</th><th>Aktif</th><th></th></tr></thead><tbody>${(st.rooms[l] || []).map(roomRow).join("")}</tbody></table></div><button class="btn btn-ghost btn-sm" data-addroom="${esc(l)}" type="button">${icon("add", 14)} Tambah room</button>`).join("")}
+    <div class="form-card"><details open class="set-sec"><summary>${icon("store")} Cabang (Lokasi)</summary>
+      <p class="muted">Default 1 cabang dengan 1 room. Tambah atau hapus sesuai kebutuhan. Minimal 1 cabang dan 1 room per cabang.</p>
+      <div id="lokList">${st.lokasi.map(l => lokBlock(l, st.rooms[l] || [])).join("")}</div>
+      <div class="add-lok">
+        <input id="lokNew" placeholder="Nama cabang baru (mis. GAMBUT)">
+        <button class="btn btn-ghost" id="lokAdd" type="button">${icon("add", 16)} Tambah</button>
+      </div>
     </details></div>
 
     <div class="form-card"><details class="set-sec"><summary>${icon("event_busy")} Hari Libur / Tutup</summary>
@@ -43,66 +69,135 @@ export function renderSettings(el, S, H) {
 
     <button class="btn btn-save btn-block" id="setSave">${icon("save")} Simpan Pengaturan</button>
 
-    <div class="form-card" style="margin-top:22px"><details open class="set-sec"><summary>${icon("qr_code_2")} QRIS</summary>
-      <p class="muted">Upload foto/screenshot QRIS merchant kamu (yang statis). Sistem membaca isinya, lalu membuat QR dengan nominal terkunci untuk setiap pelanggan. Tersimpan otomatis saat upload. "DEFAULT" dipakai bila lokasi tidak punya QRIS sendiri.</p>
-      ${scopes.map(k => `<div class="panel" data-q="${esc(k)}"><b>${k === "DEFAULT" ? "DEFAULT (semua lokasi)" : esc(k)}</b><div class="muted" data-qinfo></div><div data-qprev></div>
-        <input type="file" accept="image/*" data-qfile style="margin-top:8px"><div class="row-btns"><button class="btn btn-delete btn-sm" data-qdel type="button">Hapus</button></div></div>`).join("")}</details></div>
-
     <div class="form-card"><details class="set-sec"><summary>${icon("build")} Perawatan Data</summary>
-      <p class="muted">Kuota gratis Firebase terbatas. Ekspor dulu, lalu bersihkan booking lama (&gt; 90 hari).</p>
+      <p class="muted">Kuota gratis Firebase terbatas. Ekspor dulu, lalu bersihkan booking lama (&gt; 30 hari).</p>
       <div class="row-btns"><button class="btn btn-ghost" id="mExp">${icon("download", 16)} Ekspor CSV</button><button class="btn btn-delete" id="mClean">${icon("delete_sweep", 16)} Bersihkan data lama</button></div></details></div>`;
 
-    /* room rows */
-    el.onclick = e => {
-        const d = e.target.closest("[data-delrow]"); if (d) d.closest("tr").remove();
-        const a = e.target.closest("[data-addroom]"); if (a) $(`table[data-lok="${CSS.escape(a.dataset.addroom)}"] tbody`, el).insertAdjacentHTML("beforeend", roomRow({ name: "", rate: 0, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }));
-    };
-    /* libur */
+    const drawQ = () => $$("[data-loksec]", el).forEach(sec => {
+        const l = sec.dataset.loksec, q = S.qris[l];
+        const infoEl = $(`[data-qinfo="${CSS.escape(l)}"]`, sec);
+        const prevEl = $(`[data-qprev="${CSS.escape(l)}"]`, sec);
+        if (infoEl) infoEl.textContent = q ? `Tersimpan: ${q.merchant || "(tanpa nama)"}` : "Belum ada QRIS";
+        if (prevEl) prevEl.innerHTML = q ? (() => {
+            try { return `<div class="qris-prev">${qrSvg(makeDynamic(q.payload, 1000))}</div><small class="hint">Contoh QR Rp 1.000 (hanya tes, jangan dibayar)</small>`; }
+            catch (e) { return ""; }
+        })() : "";
+    });
+
     const drawHol = () => {
-        $("#holList", el).innerHTML = hol.length ? hol.sort((a, b) => a.date.localeCompare(b.date)).map((h, i) => `<div class="kv"><span>${esc(h.date)} · ${esc(h.lokasi === "ALL" ? "Semua" : h.lokasi)}</span><b>${esc(h.alasan || "-")} <button class="btn btn-ghost btn-sm" data-hdel="${i}" type="button">${icon("close", 12)}</button></b></div>`).join("") : `<p class="muted">Belum ada hari libur.</p>`;
+        $("#holList", el).innerHTML = hol.length
+            ? hol.sort((a, b) => a.date.localeCompare(b.date)).map((h, i) => `<div class="kv"><span>${esc(h.date)} · ${esc(h.lokasi === "ALL" ? "Semua" : h.lokasi)}</span><b>${esc(h.alasan || "-")} <button class="btn btn-ghost btn-sm" data-hdel="${i}" type="button">${icon("close", 12)}</button></b></div>`).join("")
+            : `<p class="muted">Belum ada hari libur.</p>`;
         $$("[data-hdel]", el).forEach(b => b.onclick = () => { hol.splice(+b.dataset.hdel, 1); drawHol(); });
     };
-    drawHol();
-    $("#hAdd", el).onclick = () => { const date = $("#hDate", el).value; if (!date) return toast("Pilih tanggal", "error"); hol.push({ date, lokasi: $("#hLok", el).value, alasan: $("#hWhy", el).value.trim() }); $("#hWhy", el).value = ""; drawHol(); toast("Libur ditambahkan. Jangan lupa tekan Simpan.", "info"); };
 
-    /* QRIS */
-    const drawQ = () => $$("[data-q]", el).forEach(box => {
-        const k = box.dataset.q, q = S.qris[k];
-        $("[data-qinfo]", box).textContent = q ? `Tersimpan: ${q.merchant || "(tanpa nama)"}` : "Belum ada";
-        $("[data-qprev]", box).innerHTML = q ? (() => { try { return `<div class="qris-prev">${qrSvg(makeDynamic(q.payload, 1000), 3)}</div><small class="hint">Contoh QR nominal ${rupiah(1000)} (hanya tes, jangan dibayar)</small>`; } catch (e) { return ""; } })() : "";
-    });
-    drawQ();
-    $$("[data-qfile]", el).forEach(inp => inp.onchange = async () => {
-        const f = inp.files[0]; if (!f) return; const k = inp.closest("[data-q]").dataset.q;
+    drawQ(); drawHol();
+
+    el.onclick = e => {
+        const delrow = e.target.closest("[data-delrow]");
+        if (delrow) { delrow.closest("tr").remove(); return; }
+        const addroom = e.target.closest("[data-addroom]");
+        if (addroom) {
+            const tbl = $(`table[data-lok="${CSS.escape(addroom.dataset.addroom)}"] tbody`, el);
+            if (tbl) tbl.insertAdjacentHTML("beforeend", roomRow({ name: "", rate: 0, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }));
+            return;
+        }
+        const removelok = e.target.closest("[data-removelok]");
+        if (removelok) {
+            const l = removelok.dataset.removelok;
+            if ($$("[data-loksec]", el).length <= 1) return toast("Minimal 1 cabang", "error");
+            if (!confirm(`Hapus cabang "${l}"?`)) return;
+            removelok.closest("[data-loksec]").remove();
+            return;
+        }
+        const qdel = e.target.closest("[data-qdel]");
+        if (qdel) {
+            (async () => {
+                const l = qdel.dataset.qdel;
+                if (!S.qris[l] || !confirm("Hapus QRIS " + l + "?")) return;
+                delete S.qris[l];
+                try { await setDoc(doc(db, "config", "qris"), S.qris); drawQ(); }
+                catch (err) { toast("Gagal hapus: " + (err.code || err.message), "error"); }
+            })();
+            return;
+        }
+        const hdel = e.target.closest("[data-hdel]");
+        if (hdel) { hol.splice(+hdel.dataset.hdel, 1); drawHol(); }
+    };
+
+    el.onchange = async e => {
+        const inp = e.target.closest("[data-qfile]");
+        if (!inp) return;
+        const f = inp.files[0]; if (!f) return;
+        const l = inp.dataset.qfile;
         try {
             const payload = (await decodeQrFromFile(f)).trim(), info = validateQris(payload);
-            S.qris[k] = { payload, merchant: info.merchant, image: await compressImage(f, 700, 0.7) };
-            await setDoc(doc(db, "config", "qris"), S.qris); drawQ(); toast(`QRIS ${k} tersimpan: ${info.merchant}`, "success");
-        } catch (e) { toast(e.message || "Gagal membaca QRIS", "error"); }
+            S.qris[l] = { payload, merchant: info.merchant, image: await compressImage(f, 700, 0.7) };
+            await setDoc(doc(db, "config", "qris"), S.qris);
+            drawQ();
+            toast(`QRIS ${l} tersimpan: ${info.merchant}`, "success");
+        } catch (err) { toast(err.message || "Gagal membaca QRIS", "error"); }
         inp.value = "";
-    });
-    $$("[data-qdel]", el).forEach(b => b.onclick = async () => { const k = b.closest("[data-q]").dataset.q; if (!S.qris[k] || !confirm("Hapus QRIS " + k + "?")) return; delete S.qris[k]; await setDoc(doc(db, "config", "qris"), S.qris); drawQ(); });
+    };
 
-    $("#mExp", el).onclick = H.exportCsv; $("#mClean", el).onclick = () => H.cleanup(90);
+    $("#lokAdd", el).onclick = () => {
+        const name = $("#lokNew", el).value.trim();
+        if (!name) return toast("Isi nama cabang", "error");
+        if ($$(`[data-loksec="${CSS.escape(name)}"]`, el).length) return toast("Cabang sudah ada", "error");
+        $("#lokList", el).insertAdjacentHTML("beforeend", lokBlock(name, [{ name: "Room 1", rate: 0, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }]));
+        $("#lokNew", el).value = "";
+        drawQ();
+        toast("Cabang ditambahkan. Jangan lupa Simpan.", "info");
+    };
 
-    /* simpan */
+    $("#hAdd", el).onclick = () => {
+        const date = $("#hDate", el).value; if (!date) return toast("Pilih tanggal", "error");
+        hol.push({ date, lokasi: $("#hLok", el).value, alasan: $("#hWhy", el).value.trim() });
+        $("#hWhy", el).value = ""; drawHol(); toast("Libur ditambahkan. Jangan lupa Simpan.", "info");
+    };
+
+    $("#mExp", el).onclick = H.exportCsv;
+    $("#mClean", el).onclick = () => H.cleanup(30);
+
     $("#setSave", el).onclick = async e => {
         const g = id => parseFloat(String($("#" + id, el).value).replace(",", ".")) || 0;
-        const next = { ...st, dpPercent: g("sDp"), holdMinutes: g("sHold"), bufferMin: g("sBuf"), noShowGraceMin: g("sGrace"), pendingTtlHours: g("sTtl"), minLeadMin: g("sLead"), maxDurasi: g("sMaxD") || 12, micPrice: parseNum($("#sMic", el).value), addonPerHour: $("#sPerHour", el).checked, adminWA: $("#sWa", el).value.trim() ? normWA($("#sWa", el).value) : "", policy: $("#sPolicy", el).value.trim(), holidays: hol, rooms: {}, templates: {} };
-        if (next.dpPercent < 1 || next.dpPercent > 100) return toast("DP harus 1–100%", "error");
-        for (const l of st.lokasi) {
-            const rows = $$(`table[data-lok="${CSS.escape(l)}"] tr[data-row]`, el), names = new Set(); next.rooms[l] = [];
+        const nextLokasi = [], nextRooms = {};
+        for (const sec of $$("[data-loksec]", el)) {
+            const l = sec.dataset.loksec;
+            nextLokasi.push(l);
+            const rows = $$(`table[data-lok="${CSS.escape(l)}"] tr[data-row]`, el), names = new Set();
+            nextRooms[l] = [];
             for (const tr of rows) {
                 const f = n => $(`[data-f=${n}]`, tr), name = f("name").value.trim();
-                if (!name) return toast("Nama room tidak boleh kosong", "error");
-                if (names.has(name)) return toast(`Nama room ganda: ${name}`, "error"); names.add(name);
-                next.rooms[l].push({ name, rate: parseNum(f("rate").value), baseCap: parseInt(f("baseCap").value) || 1, maxCap: parseInt(f("maxCap").value) || 0, extraPrice: parseNum(f("extraPrice").value), active: f("active").checked });
+                if (!name) return toast(`Nama room di ${l} tidak boleh kosong`, "error");
+                if (names.has(name)) return toast(`Nama room ganda di ${l}: ${name}`, "error");
+                names.add(name);
+                nextRooms[l].push({ name, rate: parseNum(f("rate").value), baseCap: parseInt(f("baseCap").value) || 1, maxCap: parseInt(f("maxCap").value) || 0, extraPrice: parseNum(f("extraPrice").value), active: f("active").checked });
             }
+            if (!nextRooms[l].length) return toast(`Cabang ${l} minimal punya 1 room`, "error");
         }
+        if (!nextLokasi.length) return toast("Minimal 1 cabang", "error");
+        const next = {
+            ...st, dpPercent: g("sDp"), holdMinutes: g("sHold"), bufferMin: g("sBuf"), noShowGraceMin: g("sGrace"),
+            pendingTtlHours: g("sTtl"), minLeadMin: g("sLead"), maxDurasi: g("sMaxD") || 12,
+            micPrice: parseNum($("#sMic", el).value), addonPerHour: $("#sPerHour", el).checked,
+            adminWA: $("#sWa", el).value.trim() ? normWA($("#sWa", el).value) : "", policy: $("#sPolicy", el).value.trim(),
+            holidays: hol, lokasi: nextLokasi, rooms: nextRooms, templates: {}
+        };
+        if (next.dpPercent < 1 || next.dpPercent > 100) return toast("DP harus 1–100%", "error");
         $$("[data-tpl]", el).forEach(t => next.templates[t.dataset.tpl] = t.value);
         e.currentTarget.disabled = true;
-        try { await setDoc(doc(db, "config", "settings"), next); Object.assign(S.st, next); S.needSeed = false; toast("Pengaturan tersimpan", "success"); }
-        catch (err) { toast("Gagal menyimpan: " + (err.code || err.message), "error"); }
+        try {
+            await setDoc(doc(db, "config", "settings"), next);
+            Object.assign(S.st, next);
+            S.needSeed = false;
+            const removedLok = st.lokasi.filter(l => !nextLokasi.includes(l));
+            if (removedLok.some(l => S.qris[l])) {
+                removedLok.forEach(l => { if (S.qris[l]) delete S.qris[l]; });
+                await setDoc(doc(db, "config", "qris"), S.qris);
+            }
+            toast("Pengaturan tersimpan", "success");
+        } catch (err) { toast("Gagal menyimpan: " + (err.code || err.message), "error"); }
         e.currentTarget.disabled = false;
     };
 }

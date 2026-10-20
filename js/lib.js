@@ -1,14 +1,11 @@
-// Utilitas bersama user & admin
-export const TZ = "+08:00"; // WITA (Kalimantan Selatan)
+export const TZ = "+08:00";
 const H = 3600000;
 
-/* ---------- aman dari XSS ---------- */
 export const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 export const debounce = (fn, ms = 250) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
-/* ---------- jam server (jam HP user bisa salah) ---------- */
 let clockOffset = 0;
 export const now = () => Date.now() + clockOffset;
 export async function syncClock() {
@@ -17,22 +14,23 @@ export async function syncClock() {
         const r = await fetch(location.pathname + "?_=" + t0, { method: "HEAD", cache: "no-store" });
         const d = r.headers.get("date");
         if (d) { const srv = Date.parse(d); const t1 = Date.now(); clockOffset = srv - (t0 + t1) / 2; if (Math.abs(clockOffset) < 1500) clockOffset = 0; }
-    } catch (e) { /* abaikan, pakai jam device */ }
+    } catch (e) { }
 }
 
-/* ---------- waktu (semua dihitung WITA, bebas dari timezone device) ---------- */
 export const toMs = (date, time) => Date.parse(`${date}T${time}:00${TZ}`);
 export const witaDate = ms => new Date(ms + 8 * H).toISOString().slice(0, 10);
 export const witaTime = ms => new Date(ms + 8 * H).toISOString().slice(11, 16);
 export const witaDateTimeInput = ms => witaDate(ms) + "T" + witaTime(ms);
 export const fromDateTimeInput = v => Date.parse(v + ":00" + TZ);
 export const addDays = (date, n) => witaDate(Date.parse(date + "T12:00:00" + TZ) + n * 24 * H);
+
 export function fmtDate(date, long = true) {
     const d = new Date(date + "T12:00:00Z");
     return new Intl.DateTimeFormat("id-ID", { weekday: long ? "long" : "short", day: "numeric", month: long ? "long" : "short", year: "numeric", timeZone: "UTC" }).format(d);
 }
 export const fmtDT = ms => `${fmtDate(witaDate(ms), false)} ${witaTime(ms)}`;
 export const tsMs = t => (t && typeof t.toMillis === "function") ? t.toMillis() : (typeof t === "number" ? t : 0);
+
 export function fmtCountdown(ms) {
     if (ms <= 0) return "00:00";
     const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
@@ -40,9 +38,9 @@ export function fmtCountdown(ms) {
     return h > 0 ? `${h}:${p(m)}:${p(ss)}` : `${p(m)}:${p(ss)}`;
 }
 
-/* ---------- format ---------- */
 export const rupiah = n => "Rp " + new Intl.NumberFormat("id-ID").format(Math.round(n || 0));
 export const parseNum = s => parseInt(String(s ?? "").replace(/\D/g, ""), 10) || 0;
+
 export function normWA(s) {
     let d = String(s || "").replace(/\D/g, "");
     if (d.startsWith("0")) d = "62" + d.slice(1);
@@ -52,24 +50,24 @@ export function normWA(s) {
 export const validWA = s => /^628\d{7,12}$/.test(normWA(s));
 export const waLink = (num, text) => `https://wa.me/${normWA(num)}${text ? "?text=" + encodeURIComponent(text) : ""}`;
 
-/* ---------- id & hash ---------- */
 const B32 = "abcdefghijklmnopqrstuvwxyz234567";
-export function randSecret(bytes = 16) { // 16 byte = 128 bit -> 26 karakter
+export function randSecret(bytes = 16) {
     const a = crypto.getRandomValues(new Uint8Array(bytes)); let bits = 0, v = 0, out = "";
     for (const x of a) { v = (v << 8) | x; bits += 8; while (bits >= 5) { out += B32[(v >>> (bits - 5)) & 31]; bits -= 5; } }
     if (bits > 0) out += B32[(v << (5 - bits)) & 31];
     return out;
 }
+
 const KA = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 export function genKode() { const a = crypto.getRandomValues(new Uint8Array(6)); return "ARY-" + [...a].map(x => KA[x % KA.length]).join(""); }
 export const normKode = s => { s = String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); if (s.startsWith("ARY")) s = s.slice(3); return s.length === 6 ? "ARY-" + s : ""; };
+
 export async function sha256(str) {
     const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
     return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
 }
 export const lookupId = (kode, wa) => sha256(`${normKode(kode)}|${normWA(wa)}`);
 
-/* ---------- status ---------- */
 export const STATUS = {
     PENDING: ["Menunggu Konfirmasi", "#f59e0b"],
     MENUNGGU_BAYAR: ["Menunggu Pembayaran", "#3b82f6"],
@@ -82,10 +80,9 @@ export const STATUS = {
     DIBATALKAN: ["Dibatalkan", "#9ca3af"],
     NO_SHOW: ["Tidak Datang", "#f87171"]
 };
-export const HOLDING = ["MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"]; // status yg menahan slot
+export const HOLDING = ["MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"];
 export const pill = st => `<span class="pill" style="--c:${(STATUS[st] || ["", "#999"])[1]}">${esc((STATUS[st] || [st])[0])}</span>`;
 
-// Status "efektif": kedaluwarsa dihitung saat dibaca (tanpa Cloud Functions)
 export function effStatus(b, st, t = now()) {
     if (b.status === "PENDING") {
         const ttl = (st.pendingTtlHours || 24) * H;
@@ -95,11 +92,12 @@ export function effStatus(b, st, t = now()) {
     return b.status;
 }
 
-/* ---------- pengaturan default ---------- */
-const mkRooms = () => ["VIP 1", "VIP 2", "PREMIER 1", "PREMIER 2"].map(name => ({ name, rate: 0, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }));
+const mkRooms = () => [{ name: "Room 1", rate: 0, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }];
+const DEF_LOK = "CABANG 1";
+
 export const DEFAULT_SETTINGS = {
-    lokasi: ["GAMBUT", "BERUNTUNG"],
-    rooms: { GAMBUT: mkRooms(), BERUNTUNG: mkRooms() },
+    lokasi: [DEF_LOK],
+    rooms: { [DEF_LOK]: mkRooms() },
     micPrice: 0, addonPerHour: true,
     dpPercent: 50, holdMinutes: 30, bufferMin: 0, noShowGraceMin: 15, pendingTtlHours: 24, minLeadMin: 15, maxDurasi: 12,
     adminWA: "", holidays: [], policy: "DP hangus jika batal setelah pembayaran atau tidak datang.",
@@ -111,10 +109,12 @@ export const DEFAULT_SETTINGS = {
         confirmed: "Halo {nama}, pembayaran DP sudah kami terima ✅\nSampai jumpa {tanggal} jam {jam} di {lokasi} ({room}). Tunjukkan QR di link ini saat datang:\n{link}\nKode: {kode}"
     }
 };
+
 export function mergeSettings(s) {
     const d = DEFAULT_SETTINGS; s = s || {};
-    return { ...d, ...s, templates: { ...d.templates, ...(s.templates || {}) }, rooms: { ...d.rooms, ...(s.rooms || {}) }, holidays: s.holidays || [] };
+    return { ...d, ...s, templates: { ...d.templates, ...(s.templates || {}) }, rooms: { ...d.rooms, ...(s.rooms || {}) }, lokasi: s.lokasi || d.lokasi, holidays: s.holidays || [] };
 }
+
 export const roomCfg = (st, lokasi, room) => (st.rooms[lokasi] || []).find(r => r.name === room);
 export const isHoliday = (st, lokasi, date) => (st.holidays || []).find(h => h.date === date && (h.lokasi === "ALL" || h.lokasi === lokasi));
 
@@ -124,7 +124,7 @@ export function calcPrice(st, room, durasi, orang, mic) {
     const extraN = Math.max(0, orang - (room.baseCap || 0));
     const base = (room.rate || 0) * durasi, extra = extraN * (room.extraPrice || 0) * mult, micT = (mic || 0) * (st.micPrice || 0) * mult;
     const total = base + extra + micT;
-    const dp = total > 0 ? Math.ceil(total * (st.dpPercent || 50) / 100 / 1000) * 1000 : 0;
+    const dp = total > 0 ? Math.round(total * (st.dpPercent || 50) / 100) : 0;
     return { base, extraN, extra, micT, total, dp };
 }
 
@@ -132,7 +132,6 @@ export const fillTpl = (tpl, v) => String(tpl || "").replace(/\{(\w+)\}/g, (_, k
 export const siteLink = () => location.origin + location.pathname.replace(/[^/]*$/, "");
 export const bookingLink = secret => siteLink() + "index.html#/b/" + secret;
 
-/* ---------- UI helper ---------- */
 export function toast(message, type = "info") {
     const t = document.createElement("div"); t.className = "toast " + type;
     const icons = { success: "check_circle", error: "error", info: "info" };
@@ -141,6 +140,7 @@ export function toast(message, type = "info") {
     if (type === "error") { const fc = $(".form-card"); if (fc) { fc.classList.remove("shake"); void fc.offsetWidth; fc.classList.add("shake"); } }
     setTimeout(() => { t.style.opacity = "0"; t.style.transform = "translateX(120%)"; setTimeout(() => t.remove(), 300); }, 4200);
 }
+
 export function modal(html, { sticky = false } = {}) {
     const ov = document.createElement("div"); ov.className = "modal-overlay";
     ov.innerHTML = `<div class="modal-card wide">${html}</div>`;
@@ -150,6 +150,7 @@ export function modal(html, { sticky = false } = {}) {
     $$("[data-close]", ov).forEach(b => b.addEventListener("click", close));
     return { el: ov.firstElementChild, close };
 }
+
 export function confirmBox(title, msg, ok = "Ya", danger = false) {
     return new Promise(res => {
         const m = modal(`<div class="modal-icon"><span class="material-icons-round">${danger ? "warning" : "help"}</span></div><h3>${esc(title)}</h3><p>${esc(msg)}</p>
@@ -158,10 +159,12 @@ export function confirmBox(title, msg, ok = "Ya", danger = false) {
         $("#cbOk", m.el).addEventListener("click", () => { m.close(); res(true); });
     });
 }
+
 export function setBusy(btn, on, text) {
     if (on) { btn.dataset.o = btn.innerHTML; btn.disabled = true; btn.classList.add("btn-loading"); if (text) btn.textContent = text; }
     else { btn.disabled = false; btn.classList.remove("btn-loading"); if (btn.dataset.o) btn.innerHTML = btn.dataset.o; }
 }
+
 export async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("Disalin", "success"); } catch (e) { prompt("Salin manual:", t); } }
 export const icon = (n, size = 18) => `<span class="material-icons-round" style="font-size:${size}px">${n}</span>`;
 
@@ -173,7 +176,30 @@ export function qrSvg(text) {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${t} ${t}" shape-rendering="crispEdges"><rect width="${t}" height="${t}" fill="#fff"/><path d="${p}" fill="#000"/></svg>`;
 }
 
-// kompres gambar -> data URL jpeg kecil (untuk bukti bayar / foto QRIS)
+export async function downloadQrPng(svgEl, filename) {
+    const svgStr = new XMLSerializer().serializeToString(svgEl);
+    const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+    try {
+        const img = new Image();
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+        const size = 800;
+        const canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
+        const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
+        const dlUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = dlUrl;
+        a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(dlUrl), 1000);
+    } finally { URL.revokeObjectURL(url); }
+}
+
 export async function compressImage(file, maxSide = 1000, quality = 0.6) {
     const bmp = await createImageBitmap(file);
     const sc = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));

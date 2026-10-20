@@ -91,7 +91,10 @@ function setTab(t) {
     if (S.tab === "scan" && t !== "scan") stopScan();
     S.tab = t; renderTabs();
     const tools = $("#tools");
-    const locSeg = ["inbox", "list", "board"].includes(t) ? `<div class="seg">${["ALL", ...S.st.lokasi].map(l => `<button data-loc="${esc(l)}" class="${S.loc === l ? "on" : ""}">${l === "ALL" ? "Semua" : esc(l)}</button>`).join("")}</div>` : "";
+    const multiLok = S.st.lokasi.length > 1;
+    const locSeg = ["inbox", "list", "board"].includes(t) && multiLok
+        ? `<div class="seg">${["ALL", ...S.st.lokasi].map(l => `<button data-loc="${esc(l)}" class="${S.loc === l ? "on" : ""}">${l === "ALL" ? "Semua" : esc(l)}</button>`).join("")}</div>`
+        : "";
     let extra = "";
     if (t === "list") extra = `<select id="fStatus">${[["AKTIF", "Aktif"], ["SEMUA", "Semua status"], ...Object.entries(STATUS).map(([k, v]) => [k, v[0]])].map(([k, l]) => `<option value="${k}" ${S.f.status === k ? "selected" : ""}>${l}</option>`).join("")}</select>
       <select id="fDay">${[["ALL", "Semua tanggal"], ["TODAY", "Hari ini"], ["TOM", "Besok"], ["WEEK", "7 hari ke depan"]].map(([k, l]) => `<option value="${k}" ${S.f.day === k ? "selected" : ""}>${l}</option>`).join("")}</select>
@@ -112,7 +115,7 @@ function renderBody() {
     else if (S.tab === "board") el.innerHTML = boardHTML();
 }
 
-const locTag = l => `<span class="loc-tag loc-${Math.min(1, Math.max(0, S.st.lokasi.indexOf(l)))}">${esc(l)}</span>`;
+const locTag = l => `<span class="loc-tag loc-${Math.min(3, Math.max(0, S.st.lokasi.indexOf(l)))}">${esc(l)}</span>`;
 
 function cardHTML(b, i = 0) {
     const st = eff(b), r = roomCfg(S.st, b.lokasi, b.room), extra = r ? Math.max(0, b.orang - r.baseCap) : 0;
@@ -165,8 +168,16 @@ function listHTML() {
         return true;
     });
     arr = arr.sort(f.sort === "masuk" ? (a, b) => tsMs(b.createdAt) - tsMs(a.createdAt) : (a, b) => a.startMs - b.startMs);
-    return `<div class="muted" style="margin-bottom:10px">${arr.length} booking · riwayat ${S.hist} hari ke belakang ${S.hist < 30 ? `<button class="btn btn-ghost btn-sm" data-act="hist">Muat 30 hari</button>` : ""}
-      ${q.length >= 3 ? `<button class="btn btn-ghost btn-sm" data-act="deepsearch">Cari di semua riwayat</button>` : ""}</div>${gridOf(arr, "Tidak ada booking yang cocok.")}`;
+    const info = `<div class="muted" style="margin-bottom:10px">${arr.length} booking · riwayat ${S.hist} hari ke belakang ${S.hist < 30 ? `<button class="btn btn-ghost btn-sm" data-act="hist">Muat 30 hari</button>` : ""}
+      ${q.length >= 3 ? `<button class="btn btn-ghost btn-sm" data-act="deepsearch">Cari di semua riwayat</button>` : ""}</div>`;
+    const showGroups = S.loc === "ALL" && S.st.lokasi.length > 1;
+    if (!showGroups) return info + gridOf(arr, "Tidak ada booking yang cocok.");
+    const groups = S.st.lokasi.map(l => {
+        const items = arr.filter(b => b.lokasi === l);
+        if (!items.length) return "";
+        return `<div class="section-header"><div class="section-title">${icon("place", 22)} ${esc(l)}</div><span class="count-badge">${items.length}</span></div>${gridOf(items, "")}`;
+    }).filter(Boolean).join("");
+    return info + (groups || `<div class="empty-state"><span class="material-icons-round">inbox</span><p>Tidak ada booking yang cocok.</p></div>`);
 }
 
 function boardHTML() {
@@ -277,7 +288,7 @@ function approveModal(b) {
       <div class="modal-actions" style="margin-top:16px"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-ok" id="aGo">${icon("check", 16)} Setujui</button></div>`);
     let dpTouched = false;
     $("#aDp", m.el).addEventListener("input", () => dpTouched = true);
-    $("#aTotal", m.el).addEventListener("input", e => { if (!dpTouched) $("#aDp", m.el).value = Math.ceil(parseNum(e.target.value) * S.st.dpPercent / 100 / 1000) * 1000 || ""; });
+    $("#aTotal", m.el).addEventListener("input", e => { if (!dpTouched) $("#aDp", m.el).value = Math.round(parseNum(e.target.value) * S.st.dpPercent / 100) || ""; });
     $("#aGo", m.el).onclick = async e => {
         const total = parseNum($("#aTotal", m.el).value), dp = parseNum($("#aDp", m.el).value), method = $("#aMethod", m.el).value, deadline = fromDateTimeInput($("#aDead", m.el).value);
         if (!$("#aChk", m.el).checked) return toast("Centang dulu: pastikan room kosong", "error");
@@ -423,7 +434,6 @@ function manualModal(pre = {}) {
 }
 
 let sweeping = false;
-
 async function sweep() {
     if (sweeping || document.hidden || !S.bookings.length) return; sweeping = true;
     try {
@@ -499,7 +509,7 @@ async function exportCsv() {
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" })); a.download = `araya-booking-${witaDate(now())}.csv`; a.click();
 }
 
-async function cleanup(days = 90) {
+async function cleanup(days = 30) {
     if (!await confirmBox("Bersihkan data lama?", `Booking selesai/ditolak/batal/kedaluwarsa yang lebih dari ${days} hari akan dihapus permanen. Ekspor CSV dulu kalau perlu.`, "Hapus", true)) return;
     const cut = now() - days * 86400000; let n = 0;
     try {

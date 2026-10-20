@@ -2,7 +2,7 @@ import { db, doc, getDoc, onSnapshot, writeBatch, serverTimestamp } from "./fb.j
 import {
     $, $$, esc, toast, setBusy, copyText, icon, rupiah, parseNum, normWA, validWA, randSecret, genKode, normKode, lookupId,
     toMs, witaDate, witaTime, fmtDate, fmtDT, fmtCountdown, tsMs, now, syncClock, STATUS, pill, effStatus, mergeSettings, roomCfg,
-    isHoliday, calcPrice, waLink, bookingLink, qrSvg, compressImage, startBackground
+    isHoliday, calcPrice, waLink, bookingLink, qrSvg, compressImage, downloadQrPng, startBackground
 } from "./lib.js";
 import { rangesForDay, conflictsIn, checkFree } from "./avail.js";
 import { makeDynamic } from "./qris.js";
@@ -131,9 +131,12 @@ function viewForm() {
         const est = $("#f-est");
         if (!r) { est.innerHTML = ""; return; }
         const p = calcPrice(ST, r, v.durasi, v.orang, v.mic);
-        est.innerHTML = r.rate ? `<div class="kv"><span>Room ${v.durasi} jam</span><b>${rupiah(p.base)}</b></div>
-          ${p.extraN ? `<div class="kv"><span>${p.extraN} orang tambahan</span><b>${rupiah(p.extra)}</b></div>` : ""}${v.mic ? `<div class="kv"><span>${v.mic} mic</span><b>${rupiah(p.micT)}</b></div>` : ""}
-          <div class="kv total"><span>Estimasi total</span><b>${rupiah(p.total)}</b></div><div class="kv"><span>DP (${ST.dpPercent}%)</span><b>${rupiah(p.dp)}</b></div>
+        est.innerHTML = r.rate ? `
+          <div class="kv"><span>Room ${v.durasi} jam</span><b>${rupiah(p.base)}</b></div>
+          ${p.extraN ? `<div class="kv"><span>${p.extraN} orang tambahan</span><b>${rupiah(p.extra)}</b></div>` : ""}
+          ${v.mic ? `<div class="kv"><span>${v.mic} mic</span><b>${rupiah(p.micT)}</b></div>` : ""}
+          <div class="kv"><span>Estimasi total</span><b>${rupiah(p.total)}</b></div>
+          <div class="kv highlight"><span>DP yang perlu dibayar (${ST.dpPercent}%)</span><b>${rupiah(p.dp)}</b></div>
           <small class="hint">Angka final dikonfirmasi admin.</small>` : `<small class="hint">Tarif akan dikonfirmasi admin saat booking disetujui.</small>`;
     };
     const slots = async () => {
@@ -237,7 +240,11 @@ function renderDetail(secret, b, fresh) {
             const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "";
             if (q && q.payload) { try { qr = qrSvg(makeDynamic(q.payload, b.payAmount)); } catch (e) { qr = ""; } }
             body += `<div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(b.payAmount)}</div><button class="btn btn-ghost btn-sm" id="copyNom">${icon("content_copy", 14)} Salin nominal</button></div>
-              ${qr ? `<div class="qr-box">${qr}</div><p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia. Hubungi admin untuk cara bayar.</span></div>`}
+              ${qr ? `<div class="qr-box" id="payQrBox">${qr}</div>
+              <div class="row-btns" style="justify-content:center">
+                <button class="btn btn-ghost" id="dlQr">${icon("download", 16)} Unduh QR</button>
+              </div>
+              <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia. Hubungi admin untuk cara bayar.</span></div>`}
               <div class="proof"><label>Bukti pembayaran <small class="muted">(screenshot, opsional tapi disarankan)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" hidden>
               <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening">
               <button class="btn btn-save btn-block" id="paidBtn">${icon("task_alt")} Saya Sudah Bayar</button>
@@ -281,6 +288,12 @@ function renderDetail(secret, b, fresh) {
 
     $("#copyLink")?.addEventListener("click", () => copyText(link));
     $("#copyNom")?.addEventListener("click", () => copyText(String(b.payAmount)));
+    $("#dlQr")?.addEventListener("click", async () => {
+        const svg = document.querySelector("#payQrBox svg");
+        if (!svg) return;
+        try { await downloadQrPng(svg, `qris-${b.kode || "araya"}.png`); toast("QR tersimpan. Buka galeri untuk scan di e-wallet.", "success"); }
+        catch (e) { toast("Gagal mengunduh QR", "error"); }
+    });
     $("#cancelBtn")?.addEventListener("click", async () => {
         if (!confirm(b.status === "MENUNGGU_BAYAR" ? "Batalkan booking ini? Jika sudah transfer, hubungi admin dulu." : "Batalkan permintaan booking ini?")) return;
         try { await writeUser(secret, { status: "DIBATALKAN", cancelBy: "USER" }); toast("Booking dibatalkan", "success"); } catch (e) { toast("Gagal membatalkan", "error"); }
