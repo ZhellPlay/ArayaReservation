@@ -28,12 +28,12 @@ const refOf = b => doc(db, "bookings", b.id);
 const rangeTxt = b => `${b.jamMulai}–${witaTime(b.endMs)}`;
 const isOpen = s => ["PENDING", "MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"].includes(s);
 
-/* ======================= AUTH ======================= */
 function showLogin(msg = "") {
     root.innerHTML = `<div class="panel login-box"><h3 style="justify-content:center">${icon("lock")} Khusus Admin</h3><p class="muted">${esc(msg) || "Masuk dengan akun Google admin."}</p>
     <button class="btn btn-save btn-block" id="loginBtn">${icon("login")} Masuk dengan Google</button></div>`;
     $("#loginBtn").onclick = async () => { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (e) { toast("Login dibatalkan / gagal: " + (e.code || e.message), "error"); } };
 }
+
 onAuthStateChanged(auth, async user => {
     if (!user) { stopApp(); return showLogin(); }
     try { await getDocs(query(collection(db, "bookings"), limit(1))); }
@@ -43,6 +43,7 @@ onAuthStateChanged(auth, async user => {
     }
     startApp(user);
 });
+
 function stopApp() { if (unsubB) unsubB(); unsubB = null; stopScan(); }
 
 async function startApp(user) {
@@ -61,6 +62,7 @@ async function startApp(user) {
     subscribe();
     setInterval(() => { if (!document.hidden) { sweep(); if (["inbox", "list", "board"].includes(S.tab)) renderBody(); } }, 60000);
 }
+
 function subscribe() {
     if (unsubB) unsubB(); firstSnap = true;
     unsubB = onSnapshot(query(collection(db, "bookings"), where("endMs", ">=", now() - S.hist * 86400000)), snap => {
@@ -71,18 +73,20 @@ function subscribe() {
         setTimeout(sweep, 1500);
     }, e => toast("Gagal memuat data: " + (e.code || e.message), "error"));
 }
+
 function beep() { try { const c = new (window.AudioContext || window.webkitAudioContext)(), o = c.createOscillator(), g = c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value = 880; g.gain.value = .15; o.start(); setTimeout(() => { o.stop(); c.close(); }, 250); } catch (e) { } }
 
-/* ======================= TABS & TOOLS ======================= */
 const TABS = [["inbox", "inbox", "Perlu Tindakan"], ["list", "list_alt", "Semua Booking"], ["board", "meeting_room", "Room Hari Ini"], ["scan", "qr_code_scanner", "Check-in"], ["settings", "settings", "Pengaturan"]];
 const inboxItems = () => S.bookings.filter(b => locOk(b) && ["PENDING", "MENUNGGU_VERIFIKASI"].includes(eff(b)));
 const locOk = b => S.loc === "ALL" || b.lokasi === S.loc;
+
 function renderTabs() {
     const n = inboxItems().length;
     $("#tabs").innerHTML = TABS.map(([k, ic, l]) => `<button class="tab ${S.tab === k ? "on" : ""}" data-tab="${k}">${icon(ic, 18)} ${l}${k === "inbox" && n ? `<span class="badge">${n}</span>` : ""}</button>`).join("");
     $$("[data-tab]").forEach(b => b.onclick = () => setTab(b.dataset.tab));
     document.title = (n ? `(${n}) ` : "") + "ARAYA Admin";
 }
+
 function setTab(t) {
     if (S.tab === "scan" && t !== "scan") stopScan();
     S.tab = t; renderTabs();
@@ -100,6 +104,7 @@ function setTab(t) {
     if (t === "settings") renderSettings($("#body"), S, { toast, reload: async () => { const s = await getDoc(doc(db, "config", "settings")); if (s.exists()) S.st = mergeSettings(s.data()); }, exportCsv, cleanup });
     else if (t === "scan") renderScan(); else renderBody();
 }
+
 function renderBody() {
     const el = $("#body"); if (!el) return;
     if (S.tab === "inbox") el.innerHTML = inboxHTML();
@@ -107,8 +112,8 @@ function renderBody() {
     else if (S.tab === "board") el.innerHTML = boardHTML();
 }
 
-/* ======================= KARTU BOOKING ======================= */
 const locTag = l => `<span class="loc-tag loc-${Math.min(1, Math.max(0, S.st.lokasi.indexOf(l)))}">${esc(l)}</span>`;
+
 function cardHTML(b, i = 0) {
     const st = eff(b), r = roomCfg(S.st, b.lokasi, b.room), extra = r ? Math.max(0, b.orang - r.baseCap) : 0;
     const hot = ["PENDING", "MENUNGGU_VERIFIKASI"].includes(st) ? " hot" : "";
@@ -135,7 +140,9 @@ function cardHTML(b, i = 0) {
         ${b.catatan ? `<div class="detail-item">${icon("notes", 16)}<span class="val">${esc(b.catatan)}</span></div>` : ""}
       </div><div class="divider"></div><div class="act">${A.join("")}</div></div>`;
 }
+
 const gridOf = (arr, empty) => arr.length ? `<div class="bk-grid">${arr.map(cardHTML).join("")}</div>` : `<div class="empty-state"><span class="material-icons-round">inbox</span><p>${empty}</p></div>`;
+
 function inboxHTML() {
     const L = S.bookings.filter(locOk), by = f => L.filter(f).sort((a, b) => a.startMs - b.startMs);
     const sec = (title, ic, arr, empty) => `<div class="section-header"><div class="section-title">${icon(ic, 22)} ${title}</div><span class="count-badge">${arr.length}</span></div>${arr.length ? gridOf(arr) : `<p class="muted" style="margin:0 0 22px">${empty}</p>`}`;
@@ -145,6 +152,7 @@ function inboxHTML() {
         + sec("Menunggu bayar", "hourglass_top", by(b => eff(b) === "MENUNGGU_BAYAR"), "Tidak ada.")
         + sec("Datang hari ini", "today", by(b => b.status === "TERKONFIRMASI" && b.tanggal === today), "Belum ada yang terkonfirmasi hari ini.");
 }
+
 function listHTML() {
     const f = S.f, t = now(), today = witaDate(t), q = f.q.trim().toLowerCase();
     let arr = S.bookings.filter(locOk).filter(b => {
@@ -160,6 +168,7 @@ function listHTML() {
     return `<div class="muted" style="margin-bottom:10px">${arr.length} booking · riwayat ${S.hist} hari ke belakang ${S.hist < 30 ? `<button class="btn btn-ghost btn-sm" data-act="hist">Muat 30 hari</button>` : ""}
       ${q.length >= 3 ? `<button class="btn btn-ghost btn-sm" data-act="deepsearch">Cari di semua riwayat</button>` : ""}</div>${gridOf(arr, "Tidak ada booking yang cocok.")}`;
 }
+
 function boardHTML() {
     const t = now(), today = witaDate(t), locs = S.loc === "ALL" ? S.st.lokasi : [S.loc];
     return locs.map(l => {
@@ -179,7 +188,6 @@ function boardHTML() {
     }).join("");
 }
 
-/* ======================= AKSI ======================= */
 async function run(fn, ok) {
     try { await fn(); if (ok) toast(ok, "success"); return true; }
     catch (e) {
@@ -188,10 +196,12 @@ async function run(fn, ok) {
         return false;
     }
 }
+
 function conflictModal(cs) {
     const rows = cs.map(r => { const o = S.byBid.get(r.bid); return `<li>${esc(fmtDT(r.s))}–${esc(witaTime(r.e))} · ${esc(r.k)}${o ? " · " + esc(o.nama) : ""}</li>`; }).join("");
     modal(`<div class="modal-icon"><span class="material-icons-round">warning</span></div><h3>Slot sudah terisi</h3><p>Tidak bisa diproses karena bentrok dengan:</p><ul style="margin:8px 0 14px 18px">${rows}</ul><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`);
 }
+
 const changeStatus = (b, patch, { release = false, add = null } = {}) => {
     const data = { ...patch, upd: serverTimestamp() };
     if (release) data.slot = false;
@@ -199,11 +209,14 @@ const changeStatus = (b, patch, { release = false, add = null } = {}) => {
     if (release || add) return applyTx({ remove: release ? [rangeOf(b)] : [], add, bufMs: bufMs(), alive, bookingRef: refOf(b), bookingData: data });
     return updateDoc(refOf(b), data);
 };
+
 const tplVars = (b, x = {}) => ({ nama: b.nama, lokasi: b.lokasi, room: b.room, tanggal: fmtDate(b.tanggal, false), jam: `${b.jamMulai}-${witaTime(b.endMs)}`, nominal: rupiah(b.payAmount || b.dpDue || 0), deadline: b.payDeadline ? fmtDT(b.payDeadline) + " WITA" : "", link: bookingLink(b.id), kode: b.kode, alasan: b.rejectReason || "", site: siteLink(), ...x });
+
 function sendWA(b, key, x = {}) {
     if (!b.wa) return toast("Booking ini tidak punya nomor WA", "error");
     open(waLink(b.wa, fillTpl(S.st.templates[key], tplVars(b, x))), "_blank");
 }
+
 function waPrompt(b, key, title, x) {
     const m = modal(`<div class="modal-icon"><span class="material-icons-round">chat</span></div><h3>${esc(title)}</h3><p>Kirim kabar ke ${esc(b.nama)} lewat WhatsApp supaya halaman booking-nya dibuka.</p>
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Nanti</button><button class="btn btn-wa" id="waGo">${icon("send", 16)} Kirim WA</button></div>`);
@@ -222,12 +235,14 @@ const A = {
     walkin: (b, t) => manualModal({ tipe: "WALKIN", lokasi: t.dataset.l, room: t.dataset.r }),
     blok: (b, t) => manualModal({ tipe: "BLOK", lokasi: t.dataset.l, room: t.dataset.r })
 };
+
 function onBodyClick(e) {
     const t = e.target.closest("[data-act]"); if (!t) return;
     const act = t.dataset.act, b = S.bookings.find(x => x.id === t.dataset.id);
     if (["hist", "deepsearch", "walkin", "blok"].includes(act)) return A[act](null, t);
     if (b && A[act]) A[act](b, t);
 }
+
 async function deepSearch(q) {
     const found = new Map();
     try {
@@ -240,7 +255,6 @@ async function deepSearch(q) {
     S.f.status = "SEMUA"; setTab("list");
 }
 
-/* ----- Setujui ----- */
 function approveModal(b) {
     const r = roomCfg(S.st, b.lokasi, b.room) || { rate: 0, baseCap: 4, extraPrice: 0 }, p = calcPrice(S.st, r, b.durasi, b.orang, b.mic || 0);
     const clashes = S.bookings.filter(o => o.id !== b.id && o.lokasi === b.lokasi && o.room === b.room && b.startMs < o.endMs + bufMs() && b.endMs > o.startMs - bufMs());
@@ -270,19 +284,14 @@ function approveModal(b) {
         if (method === "QRIS" && dp <= 0) return toast("DP untuk QRIS harus diisi", "error");
         if (!deadline || deadline <= now()) return toast("Batas bayar harus di masa depan", "error");
         if (total && dp > total) return toast("DP tidak boleh lebih besar dari total", "error");
-        let kodeUnik = 0, payAmount = dp;
-        if (method === "QRIS") {
-            const used = new Set(S.bookings.filter(x => x.id !== b.id && ["MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI"].includes(x.status)).map(x => x.payAmount));
-            do { kodeUnik = 11 + Math.floor(Math.random() * 89); } while (used.has(dp + kodeUnik)); payAmount = dp + kodeUnik;
-        }
+        const payAmount = dp;
         setBusy(e.currentTarget, true, "Memproses…");
-        const add = addOf(b, "MENUNGGU_BAYAR", deadline), patch = { status: "MENUNGGU_BAYAR", total, dpDue: dp, dpMethod: method, kodeUnik, payAmount, payDeadline: deadline, approvedAt: now(), payNote: "" };
+        const add = addOf(b, "MENUNGGU_BAYAR", deadline), patch = { status: "MENUNGGU_BAYAR", total, dpDue: dp, dpMethod: method, payAmount, payDeadline: deadline, approvedAt: now(), payNote: "" };
         const ok = await run(() => changeStatus(b, patch, { add }), "Disetujui, slot ditahan");
         if (ok) { m.close(); waPrompt({ ...b, ...patch }, method === "CASH" ? "approveCash" : "approve", "Kabari pelanggan"); } else setBusy(e.currentTarget, false);
     };
 }
 
-/* ----- Tolak ----- */
 function rejectModal(b) {
     const m = modal(`<h3>${icon("cancel")} Tolak booking</h3><p>${esc(b.nama)} · ${esc(rangeTxt(b))}</p>
       <div class="row-btns" style="margin:0 0 10px">${["Room sedang dipakai", "Jadwal tutup / libur", "Mohon pilih jam lain"].map(t => `<button class="btn btn-ghost btn-sm" data-r="${t}">${t}</button>`).join("")}</div>
@@ -295,11 +304,10 @@ function rejectModal(b) {
     };
 }
 
-/* ----- Verifikasi pembayaran QRIS ----- */
 async function verifyModal(b) {
     let img = ""; try { const p = await getDoc(doc(db, "proofs", b.id)); if (p.exists()) img = p.data().img; } catch (e) { }
     const m = modal(`<h3>${icon("fact_check")} Verifikasi pembayaran</h3>
-      <div class="banner ok" style="flex-direction:column;gap:2px"><span>Cari di mutasi / notifikasi merchant QRIS:</span><b style="font-size:24px;font-family:Orbitron">${rupiah(b.payAmount)}</b><span class="muted">Nominal harus PERSIS sama (termasuk kode unik ${b.kodeUnik || 0}). Dilaporkan ${b.paidReportedAt ? esc(fmtDT(b.paidReportedAt)) : "-"}${b.sender ? " · pengirim: " + esc(b.sender) : ""}</span></div>
+      <div class="banner ok" style="flex-direction:column;gap:2px"><span>Cari di mutasi / notifikasi merchant QRIS:</span><b style="font-size:24px;font-family:Orbitron">${rupiah(b.payAmount)}</b><span class="muted">Nominal harus PERSIS sama. Dilaporkan ${b.paidReportedAt ? esc(fmtDT(b.paidReportedAt)) : "-"}${b.sender ? " · pengirim: " + esc(b.sender) : ""}</span></div>
       ${img ? `<img class="proof-img" src="${img}" alt="bukti">` : `<p class="muted center">Tidak ada screenshot (tidak wajib). Cukup cocokkan di mutasi.</p>`}
       <p class="muted">Screenshot bisa dipalsukan. Keputusan berdasarkan mutasi, bukan gambar.</p>
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Tutup</button><button class="btn btn-delete" id="vNo">Belum masuk</button><button class="btn btn-ok" id="vOk">${icon("check", 16)} Sudah masuk</button></div>`);
@@ -313,7 +321,7 @@ async function verifyModal(b) {
         if (await run(async () => { await changeStatus(b, patch, { add: addOf(b, "MENUNGGU_BAYAR", dl) }); try { await deleteDoc(doc(db, "proofs", b.id)); } catch (e) { } }, "Dikembalikan ke menunggu bayar (+15 menit)")) m.close();
     };
 }
-/* ----- Terima DP manual (tunai / transfer di luar sistem) ----- */
+
 function receiveModal(b) {
     const m = modal(`<h3>${icon("payments")} Terima DP</h3><p>${esc(b.nama)} · DP seharusnya ${rupiah(b.dpDue)}</p>
       <div class="form-grid"><div class="form-group"><label>Nominal diterima</label><input id="dNom" inputmode="numeric" value="${b.dpDue || ""}"></div>
@@ -326,7 +334,6 @@ function receiveModal(b) {
     };
 }
 
-/* ----- Detail / Edit / Hapus ----- */
 function detailModal(b) {
     const st = eff(b), r = roomCfg(S.st, b.lokasi, b.room), extra = r ? Math.max(0, b.orang - r.baseCap) : 0;
     const m = modal(`<h3>${esc(b.nama)} ${pill(st)}</h3>
@@ -352,6 +359,7 @@ function detailModal(b) {
         }, "Dihapus");
     };
 }
+
 function editModal(b) {
     const roomsOf = l => (S.st.rooms[l] || []).map(r => r.name);
     const m = modal(`<h3>${icon("edit")} Edit booking</h3><div class="form-grid">
@@ -382,7 +390,6 @@ function editModal(b) {
     };
 }
 
-/* ----- Walk-in / Booking manual / Blokir ----- */
 function manualModal(pre = {}) {
     const tipe = pre.tipe || "WALKIN", lok = pre.lokasi || (S.loc !== "ALL" ? S.loc : S.st.lokasi[0]);
     const m = modal(`<h3>${icon("add_circle")} Tambah manual</h3><div class="form-grid">
@@ -415,8 +422,8 @@ function manualModal(pre = {}) {
     };
 }
 
-/* ======================= SWEEP (pengganti Cloud Functions) ======================= */
 let sweeping = false;
+
 async function sweep() {
     if (sweeping || document.hidden || !S.bookings.length) return; sweeping = true;
     try {
@@ -426,13 +433,12 @@ async function sweep() {
             else if (b.status === "MENUNGGU_BAYAR" && (b.payDeadline || 0) + GRACE < t) await changeStatus(b, { status: "KEDALUWARSA" }, { release: !!b.slot });
             else if (!HOLDING.includes(b.status) && b.slot === true) await changeStatus(b, {}, { release: true });
             else if (b.status === "MENUNGGU_VERIFIKASI" && b.slotKind !== "booked") {
-                try { await changeStatus(b, {}, { add: addOf(b, "MENUNGGU_VERIFIKASI") }); } catch (e) { if (e.message === "SLOT_BENTROK") toast(`⚠ Pembayaran ${b.nama} masuk tapi slot sudah terisi booking lain! Cek manual.`, "error"); }
+                try { await changeStatus(b, {}, { add: addOf(b, "MENUNGGU_VERIFIKASI") }); } catch (e) { if (e.message === "SLOT_BENTROK") toast(`Pembayaran ${b.nama} masuk tapi slot sudah terisi booking lain! Cek manual.`, "error"); }
             }
         }
     } catch (e) { console.warn("sweep", e); } finally { sweeping = false; }
 }
 
-/* ======================= CHECK-IN: SCAN & CARI CEPAT ======================= */
 function renderScan() {
     $("#body").innerHTML = `<div class="panel"><h3>${icon("qr_code_scanner")} Scan QR pelanggan</h3><div class="scan-wrap" id="scanWrap" hidden><video id="scanVid" playsinline muted></video></div>
       <div class="row-btns"><button class="btn btn-save" id="scanStart" style="flex:0 0 auto">${icon("photo_camera", 16)} Buka kamera</button></div>
@@ -442,12 +448,14 @@ function renderScan() {
     $("#scanQ").addEventListener("input", e => renderScanList(e.target.value));
     renderScanList();
 }
+
 function renderScanList(q = ($("#scanQ")?.value || "")) {
     const el = $("#scanList"); if (!el) return; q = q.trim().toLowerCase();
     const today = witaDate(now());
     const arr = S.bookings.filter(b => (q ? `${b.nama} ${b.wa} ${b.kode}`.toLowerCase().includes(q) && isOpen(b.status) : b.tanggal === today && ["TERKONFIRMASI", "CHECKED_IN"].includes(b.status))).sort((a, b) => a.startMs - b.startMs);
     el.innerHTML = gridOf(arr, q ? "Tidak ditemukan di data yang dimuat." : "Belum ada.");
 }
+
 async function startScan() {
     try {
         scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
@@ -466,7 +474,9 @@ async function startScan() {
         tick();
     } catch (e) { toast("Kamera tidak bisa dibuka. Izinkan akses kamera atau pakai pencarian manual.", "error"); }
 }
+
 function stopScan() { if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; } const w = $("#scanWrap"); if (w) w.hidden = true; }
+
 async function showScanResult(kode) {
     let b = S.bookings.find(x => x.kode === kode);
     if (!b) { try { const s = await getDocs(query(collection(db, "bookings"), where("kode", "==", kode))); s.forEach(d => b = { id: d.id, ...d.data() }); if (b) { S.bookings.push(b); S.byBid.set(b.bid, b); } } catch (e) { } }
@@ -482,13 +492,13 @@ async function showScanResult(kode) {
     el.onclick = e => { if (e.target.closest("#scanAgain")) { el.innerHTML = ""; startScan(); } };
 }
 
-/* ======================= EKSPOR & BERSIH-BERSIH ======================= */
 async function exportCsv() {
     const rows = [["kode", "nama", "wa", "lokasi", "room", "tanggal", "jam", "durasi", "orang", "mic", "status", "tipe", "total", "dp", "dp_diterima"]];
     S.bookings.forEach(b => rows.push([b.kode, b.nama, b.wa, b.lokasi, b.room, b.tanggal, b.jamMulai, b.durasi, b.orang, b.mic, b.status, b.tipe || "ONLINE", b.total || "", b.dpDue || "", b.dpPaid || ""]));
     const csv = rows.map(r => r.map(x => `"${String(x ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" })); a.download = `araya-booking-${witaDate(now())}.csv`; a.click();
 }
+
 async function cleanup(days = 90) {
     if (!await confirmBox("Bersihkan data lama?", `Booking selesai/ditolak/batal/kedaluwarsa yang lebih dari ${days} hari akan dihapus permanen. Ekspor CSV dulu kalau perlu.`, "Hapus", true)) return;
     const cut = now() - days * 86400000; let n = 0;

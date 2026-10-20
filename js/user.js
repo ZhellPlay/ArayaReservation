@@ -10,14 +10,12 @@ import { makeDynamic } from "./qris.js";
 const H = 3600000, view = $("#view");
 let ST = mergeSettings(null), QRC = {}, unsub = null, ticker = null;
 
-/* ---------- penyimpanan lokal: daftar "booking saya" (bisa banyak per HP) ---------- */
 const mine = () => { try { return JSON.parse(localStorage.getItem("araya_mine") || "[]"); } catch (e) { return []; } };
 const setMine = a => { try { localStorage.setItem("araya_mine", JSON.stringify(a.slice(0, 30))); } catch (e) { } };
 const remember = it => setMine([it, ...mine().filter(x => x.s !== it.s)]);
 const forget = s => setMine(mine().filter(x => x.s !== s));
 const recentSubmits = () => { try { return JSON.parse(localStorage.getItem("araya_sub") || "[]").filter(t => Date.now() - t < H); } catch (e) { return []; } };
 
-/* ---------- routing ---------- */
 function route() {
     if (unsub) { unsub(); unsub = null; } clearInterval(ticker);
     const h = location.hash || "#/", m = h.match(/^#\/b\/([a-z2-7]{20,40})$/);
@@ -29,7 +27,6 @@ function route() {
 }
 addEventListener("hashchange", route);
 
-/* ======================= HOME ======================= */
 async function viewHome() {
     const list = mine();
     view.innerHTML = `
@@ -55,6 +52,7 @@ async function viewHome() {
         card.addEventListener("click", e => { const f = e.target.closest("[data-forget]"); if (f) { forget(it.s); card.remove(); } });
     });
 }
+
 function cardInner(b, st) {
     return `<div class="booking-card-header"><h3>${esc(b.kode || "")}</h3>${st === "HILANG" ? `<span class="pill" style="--c:#9ca3af">Tidak ditemukan</span>` : st ? pill(st) : `<span class="pill" style="--c:#9ca3af">Memuat…</span>`}</div>
     <div class="booking-details">
@@ -65,7 +63,6 @@ function cardInner(b, st) {
     <div class="action-buttons"><span class="muted">Lihat detail ›</span><button class="btn btn-ghost btn-sm" data-forget title="Hapus dari perangkat ini">${icon("close", 14)}</button></div>`;
 }
 
-/* ======================= CARI BOOKING ======================= */
 function viewFind() {
     view.innerHTML = `<div class="form-card"><div class="form-title">${icon("search")}<span>Cari Booking</span></div>
     <p class="muted" style="margin:14px 0">Masukkan kode booking (contoh: ARY-7K3QXD) dan nomor WhatsApp yang dipakai saat booking.</p>
@@ -89,8 +86,8 @@ function viewFind() {
     };
 }
 
-/* ======================= FORM BOOKING ======================= */
 let slotToken = 0;
+
 function viewForm() {
     const today = witaDate(now());
     view.innerHTML = `<div class="form-card"><div class="form-title">${icon("edit_note")}<span>Ajukan Booking</span></div>
@@ -129,7 +126,7 @@ function viewForm() {
         const oh = $("#f-orangHint");
         if (r) {
             const x = Math.max(0, v.orang - r.baseCap);
-            oh.textContent = r.maxCap && v.orang > r.maxCap ? `⚠ Maksimal ${r.maxCap} orang untuk room ini.` : x > 0 ? `${v.orang} orang → ${x} orang tambahan${r.extraPrice ? ` (+${rupiah(r.extraPrice)}${ST.addonPerHour ? "/jam" : ""} per orang)` : ""}.` : `${v.orang} orang masih dalam kapasitas, tanpa biaya tambahan.`;
+            oh.textContent = r.maxCap && v.orang > r.maxCap ? `Maksimal ${r.maxCap} orang untuk room ini.` : x > 0 ? `${v.orang} orang → ${x} orang tambahan${r.extraPrice ? ` (+${rupiah(r.extraPrice)}${ST.addonPerHour ? "/jam" : ""} per orang)` : ""}.` : `${v.orang} orang masih dalam kapasitas, tanpa biaya tambahan.`;
         } else oh.textContent = "";
         const est = $("#f-est");
         if (!r) { est.innerHTML = ""; return; }
@@ -197,11 +194,11 @@ function viewForm() {
         }
     };
 }
+
 function stepper(id, mn, mx, val) {
     return `<div class="stepper"><button class="stepper-btn" type="button" data-d="-1">−</button><input type="number" id="f-${id}" min="${mn}" max="${mx}" value="${val}" inputmode="numeric"><button class="stepper-btn" type="button" data-d="1">+</button></div>`;
 }
 
-/* ======================= DETAIL BOOKING ======================= */
 function viewDetail(secret) {
     view.innerHTML = `<div class="panel center muted">Memuat booking…</div>`;
     let last = null, fresh = sessionStorage.getItem("araya_new") === secret;
@@ -238,10 +235,9 @@ function renderDetail(secret, b, fresh) {
         if (cash) body += `<div class="kv total"><span>DP tunai</span><b>${rupiah(b.dpDue)}</b></div><p>Bayar DP <b>tunai di tempat</b> sebelum batas waktu. Admin akan mengubah status booking setelah menerima.</p>`;
         else {
             const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "";
-            if (q && q.payload) { try { qr = qrSvg(makeDynamic(q.payload, b.payAmount), 4); } catch (e) { qr = ""; } }
-            body += `<div class="pay-amount"><small>Transfer PERSIS sebesar</small><div class="nominal" id="nominal">${rupiah(b.payAmount)}</div><button class="btn btn-ghost btn-sm" id="copyNom">${icon("content_copy", 14)} Salin nominal</button>
-              <small class="muted">Sudah termasuk kode unik ${b.kodeUnik || 0} supaya pembayaranmu mudah dicocokkan. Jangan dibulatkan.</small></div>
-              ${qr ? `<div class="qr-box">${qr}</div><p class="center muted">${esc((q.merchant || "ARAYA GAMESTATION"))} · Scan dengan e-wallet / m-banking. Nominal sudah terisi otomatis.</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia. Hubungi admin untuk cara bayar.</span></div>`}
+            if (q && q.payload) { try { qr = qrSvg(makeDynamic(q.payload, b.payAmount)); } catch (e) { qr = ""; } }
+            body += `<div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(b.payAmount)}</div><button class="btn btn-ghost btn-sm" id="copyNom">${icon("content_copy", 14)} Salin nominal</button></div>
+              ${qr ? `<div class="qr-box">${qr}</div><p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia. Hubungi admin untuk cara bayar.</span></div>`}
               <div class="proof"><label>Bukti pembayaran <small class="muted">(screenshot, opsional tapi disarankan)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" hidden>
               <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening">
               <button class="btn btn-save btn-block" id="paidBtn">${icon("task_alt")} Saya Sudah Bayar</button>
@@ -254,7 +250,7 @@ function renderDetail(secret, b, fresh) {
     if (eff === "MENUNGGU_VERIFIKASI") body += `<div class="panel"><h3>${icon("fact_check")} Pembayaran sedang diverifikasi</h3><p class="muted">Terima kasih! Admin sedang mencocokkan pembayaranmu. Tidak perlu bayar lagi.</p></div>`;
     if (eff === "TERKONFIRMASI" || eff === "CHECKED_IN") {
         body += `<div class="panel ok"><h3>${icon(eff === "CHECKED_IN" ? "sports_esports" : "verified")} ${eff === "CHECKED_IN" ? "Selamat bermain!" : "Booking terkonfirmasi"}</h3>`;
-        if (eff === "TERKONFIRMASI") body += `<p class="muted">Tunjukkan QR ini ke admin saat datang. Datang paling lambat ${ST.noShowGraceMin} menit setelah jam mulai.</p><div class="qr-box">${qrSvg(b.kode, 5)}</div><div class="big-code">${esc(b.kode)}</div>`;
+        if (eff === "TERKONFIRMASI") body += `<p class="muted">Tunjukkan QR ini ke admin saat datang. Datang paling lambat ${ST.noShowGraceMin} menit setelah jam mulai.</p><div class="qr-box">${qrSvg(b.kode)}</div><div class="big-code">${esc(b.kode)}</div>`;
         else body += `<p class="muted">Sesi berjalan sampai ${esc(witaTime(b.endMs))}.</p>`;
         body += `</div>`;
     }
@@ -305,9 +301,9 @@ function renderDetail(secret, b, fresh) {
         } catch (x) { console.error(x); toast("Gagal mengirim. Mungkin batas waktu sudah lewat, hubungi admin.", "error"); setBusy(btn, false); }
     });
 }
+
 const writeUser = (secret, patch) => { const b = writeBatch(db); b.update(doc(db, "bookings", secret), { ...patch, upd: serverTimestamp() }); return b.commit(); };
 
-/* ======================= START ======================= */
 (async function init() {
     startBackground();
     syncClock();
