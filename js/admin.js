@@ -209,8 +209,11 @@ function cardHTML(b, i = 0) {
     else if (b.estTotal) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Estimasi ${rupiah(b.estTotal)}${b.cashDp ? " · minta DP tunai" : ""}</span></div>`;
     const A = [], id = `data-id="${b.id}"`, bt = (act, cls, ic, txt) => `<button class="btn ${cls}" data-act="${act}" ${id}>${icon(ic, 15)}${txt}</button>`;
     if (st === "PENDING") A.push(bt("approve", "btn-ok", "check", "Setujui"), bt("reject", "btn-delete", "close", "Tolak"));
-    if (st === "MENUNGGU_BAYAR") A.push(bt("receive", "btn-ok", "payments", "Terima DP"), bt("remind", "btn-wa", "chat", "Ingatkan"), bt("cancel", "btn-delete", "block", "Batalkan"));
-    if (st === "MENUNGGU_VERIFIKASI") A.push(bt("verify", "btn-ok", "fact_check", "Verifikasi"));
+    
+    // Perbaikan: Tombol receive hanya muncul di status MENUNGGU_VERIFIKASI (sebagai alternatif) atau jika memang cash
+    if (st === "MENUNGGU_BAYAR") A.push(bt("remind", "btn-wa", "chat", "Ingatkan"), bt("cancel", "btn-delete", "block", "Batalkan"));
+    if (st === "MENUNGGU_VERIFIKASI") A.push(bt("verify", "btn-ok", "fact_check", "Verifikasi"), bt("receive", "btn-ghost", "payments", "Terima Tunai"));
+    
     if (st === "TERKONFIRMASI") { A.push(bt("checkin", "btn-ok", "login", b.tipe === "BLOK" ? "Mulai" : "Check-in")); if (now() > b.startMs + S.st.noShowGraceMin * 60000) A.push(bt("noshow", "btn-delete", "person_off", "Tidak datang")); }
     if (st === "CHECKED_IN") A.push(bt("finish", "btn-warn", "stop_circle", b.tipe === "BLOK" ? "Buka kembali" : "Selesai"));
     A.push(bt("detail", "btn-ghost", "more_horiz", "Detail"));
@@ -350,14 +353,14 @@ function approveModal(b) {
       <div class="form-grid">
         <div class="form-group"><label>Total (Otomatis)</label><input value="${rupiah(p.total)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
         <div class="form-group"><label>DP (${S.st.dpPercent}%)</label><input value="${rupiah(p.dp)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
-        <div class="form-group"><label>Metode DP</label><select id="aMethod"><option value="QRIS" ${cashDefault ? "" : "selected"}>QRIS</option><option value="CASH" ${cashDefault ? "selected" : ""}>Tunai di tempat</option></select></div>
-        <div class="form-group"><label>Batas bayar (WITA)</label><input type="datetime-local" id="aDead" value="${witaDateTimeInput(defDeadline)}"></div>
+        <div class="form-group"><label>Metode DP</label><select id="aMethod" disabled style="opacity:0.7; cursor:not-allowed;"><option value="QRIS" ${cashDefault ? "" : "selected"}>QRIS</option><option value="CASH" ${cashDefault ? "selected" : ""}>Tunai di tempat</option></select></div>
+        <div class="form-group"><label>Batas bayar (WITA)</label><input type="datetime-local" id="aDead" value="${witaDateTimeInput(defDeadline)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
       </div>
       <label class="check" style="margin-top:8px"><input type="checkbox" id="aChk"><span>Saya sudah memastikan room <b>kosong</b> di jam ini (termasuk walk-in yang sedang main).</span></label>
       <div class="modal-actions" style="margin-top:20px"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-ok" id="aGo">${icon("check", 16)} Setujui</button></div>`);
     
     $("#aGo", m.el).onclick = async e => {
-        const method = $("#aMethod", m.el).value, deadline = fromDateTimeInput($("#aDead", m.el).value);
+        const method = cashDefault ? "CASH" : "QRIS", deadline = fromDateTimeInput($("#aDead", m.el).value);
         if (!$("#aChk", m.el).checked) return toast("Centang dulu: pastikan room kosong", "error");
         if (method === "QRIS" && p.dp <= 0) return toast("DP untuk QRIS harus diisi", "error");
         if (!deadline || deadline <= now()) return toast("Batas bayar harus di masa depan", "error");

@@ -281,7 +281,7 @@ function renderDetail(secret, b, fresh) {
         else {
             const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "";
             if (q && q.payload) { try { qr = qrSvg(makeDynamic(q.payload, b.payAmount)); } catch (e) { qr = ""; } }
-            body += `<div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(b.payAmount)}</div><button class="btn btn-ghost btn-sm" id="copyNom">${icon("content_copy", 14)} Salin nominal</button></div>
+            body += `<div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(b.payAmount)}</div></div>
               ${qr ? `<div class="qr-box" id="payQrBox">${qr}</div>
               <div class="row-btns" style="justify-content:center">
                 <button class="btn btn-ghost" id="dlQr">${icon("download", 16)} Unduh QR</button>
@@ -324,10 +324,10 @@ function renderDetail(secret, b, fresh) {
       <div class="kv"><span>Jam</span><b>${esc(b.jamMulai)} – ${esc(witaTime(b.endMs))} (${b.durasi} jam)</b></div>
       <div class="kv"><span>Orang</span><b>${b.orang}${extra ? ` (+${extra} tambahan)` : ""}</b></div>${b.mic ? `<div class="kv"><span>Mic tambahan</span><b>${b.mic}</b></div>` : ""}
       <div class="kv"><span>Atas nama</span><b>${esc(b.nama)}</b></div>${b.catatan ? `<div class="kv"><span>Catatan</span><b>${esc(b.catatan)}</b></div>` : ""}${money}</div>
-    <div class="panel"><h3>${icon("bookmark")} Akses Booking &amp; Bantuan</h3><p class="muted">Link ini rahasia. Simpan link agar kamu bisa mengecek status booking kapan saja. Jika link hilang atau butuh bantuan, silakan hubungi admin.</p>
+    <div class="panel"><h3>${icon("bookmark")} Akses Booking &amp; Bantuan</h3><p class="muted">Simpan link ini agar kamu bisa mengecek status booking kapan saja. Jika link hilang atau butuh bantuan, silakan hubungi admin via WhatsApp untuk mempercepat konfirmasi.</p>
       <div class="row-btns" style="justify-content: center; gap: 12px;">
         <button class="btn btn-ghost" id="copyLink">${icon("link", 16)} Salin Link</button>
-        ${adminWA ? `<a class="btn btn-wa" target="_blank" rel="noopener" href="${adminWA}">${icon("support_agent", 16)} Minta Konfirmasi via WA</a>` : ""}
+        ${adminWA ? `<a class="btn btn-wa" target="_blank" rel="noopener" href="${adminWA}">${icon("support_agent", 16)} WA Admin</a>` : ""}
       </div>
     </div>
     ${canCancel ? `<button class="btn btn-delete btn-block" id="cancelBtn">${icon("close", 16)} Batalkan booking</button>` : ""}
@@ -345,7 +345,6 @@ function renderDetail(secret, b, fresh) {
     });
 
     $("#copyLink")?.addEventListener("click", () => copyText(link));
-    $("#copyNom")?.addEventListener("click", () => copyText(String(b.payAmount)));
     $("#dlQr")?.addEventListener("click", async () => {
         const svg = document.querySelector("#payQrBox svg");
         if (!svg) return;
