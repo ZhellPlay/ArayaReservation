@@ -142,7 +142,13 @@ export function renderSettings(el, S, H) {
 
     <div class="form-card"><details class="set-sec"><summary>${icon("build")} <span style="flex:1;text-align:left">Perawatan Data</span></summary>
       <p class="muted" style="margin-bottom:16px">Ekspor dulu, lalu bersihkan booking lama (&gt; 30 hari) untuk menghemat kuota Firebase.</p>
-      <div class="row-btns"><button class="btn btn-ghost" id="mExp">${icon("download", 16)} Ekspor CSV</button><button class="btn btn-delete" id="mClean">${icon("delete_sweep", 16)} Bersihkan data lama</button></div></details></div>`;
+      <div class="row-btns"><button class="btn btn-ghost" id="mExp">${icon("download", 16)} Ekspor CSV</button><button class="btn btn-delete" id="mClean">${icon("delete_sweep", 16)} Bersihkan data lama</button></div>
+      
+      <div style="margin-top:24px; border-top:1px dashed var(--danger-border); padding-top:24px;">
+        <p class="muted" style="margin-bottom:12px; color:var(--danger)"><b>Zona Berbahaya:</b> Menghapus semua data secara permanen.</p>
+        <button class="btn btn-delete" id="mResetAll" style="width:100%">${icon("dangerous", 16)} Reset Total Database</button>
+      </div>
+    </details></div>`;
 
     el.addEventListener("input", () => S.dirty = true);
     el.addEventListener("change", () => S.dirty = true);
@@ -235,6 +241,7 @@ export function renderSettings(el, S, H) {
 
     $("#mExp", el).onclick = H.exportCsv;
     $("#mClean", el).onclick = () => H.cleanup(30);
+    $("#mResetAll", el).onclick = H.resetAllData;
 
     $("#setSave", el).onclick = async e => {
         const g = id => parseFloat(String($("#" + id, el).value).replace(",", ".")) || 0;
@@ -293,6 +300,7 @@ export function renderSettings(el, S, H) {
         $("#confirmSave", m.el).onclick = async () => {
             m.close();
             S.dirty = false;
+            e.currentTarget.disabled = true;
             try {
                 await setDoc(doc(db, "config", "settings"), next);
                 Object.assign(S.st, next);
@@ -314,6 +322,7 @@ export function renderSettings(el, S, H) {
                 S.dirty = true;
                 toast("Gagal menyimpan: " + (err.code || err.message), "error");
             }
+            e.currentTarget.disabled = false;
         };
     };
 }

@@ -1,6 +1,6 @@
 import {
     db, auth, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, limit, onSnapshot, serverTimestamp,
-    GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
+    GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, writeBatch
 } from "./fb.js";
 import {
     $, $$, esc, toast, modal, confirmBox, setBusy, copyText, icon, rupiah, parseNum, normWA, randSecret, genKode, lookupId, normKode,
@@ -155,7 +155,7 @@ function setTab(t) {
     $("#fQ")?.addEventListener("input", e => { S.f.q = e.target.value; renderBody(); });
     $("#btnFilter")?.addEventListener("click", filterModal);
 
-    if (t === "settings") renderSettings($("#body"), S, { toast, reload: async () => { const s = await getDoc(doc(db, "config", "settings")); if (s.exists()) S.st = mergeSettings(s.data()); }, exportCsv, cleanup, switchTab: setTab });
+    if (t === "settings") renderSettings($("#body"), S, { toast, reload: async () => { const s = await getDoc(doc(db, "config", "settings")); if (s.exists()) S.st = mergeSettings(s.data()); }, exportCsv, cleanup, switchTab: setTab, resetAllData });
     else if (t === "scan") renderScan(); else renderBody();
 }
 
@@ -209,11 +209,8 @@ function cardHTML(b, i = 0) {
     else if (b.estTotal) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Estimasi ${rupiah(b.estTotal)}${b.cashDp ? " · minta DP tunai" : ""}</span></div>`;
     const A = [], id = `data-id="${b.id}"`, bt = (act, cls, ic, txt) => `<button class="btn ${cls}" data-act="${act}" ${id}>${icon(ic, 15)}${txt}</button>`;
     if (st === "PENDING") A.push(bt("approve", "btn-ok", "check", "Setujui"), bt("reject", "btn-delete", "close", "Tolak"));
-    
-    // Perbaikan: Tombol receive hanya muncul di status MENUNGGU_VERIFIKASI (sebagai alternatif) atau jika memang cash
     if (st === "MENUNGGU_BAYAR") A.push(bt("remind", "btn-wa", "chat", "Ingatkan"), bt("cancel", "btn-delete", "block", "Batalkan"));
     if (st === "MENUNGGU_VERIFIKASI") A.push(bt("verify", "btn-ok", "fact_check", "Verifikasi"), bt("receive", "btn-ghost", "payments", "Terima Tunai"));
-    
     if (st === "TERKONFIRMASI") { A.push(bt("checkin", "btn-ok", "login", b.tipe === "BLOK" ? "Mulai" : "Check-in")); if (now() > b.startMs + S.st.noShowGraceMin * 60000) A.push(bt("noshow", "btn-delete", "person_off", "Tidak datang")); }
     if (st === "CHECKED_IN") A.push(bt("finish", "btn-warn", "stop_circle", b.tipe === "BLOK" ? "Buka kembali" : "Selesai"));
     A.push(bt("detail", "btn-ghost", "more_horiz", "Detail"));
@@ -632,4 +629,39 @@ async function cleanup(days = 30) {
         }
         toast(`${n} booking lama dihapus`, "success");
     } catch (e) { toast("Gagal membersihkan: " + (e.code || e.message), "error"); }
+}
+
+async function resetAllData() {
+    const confirm = await confirmBox("RESET TOTAL DATABASE", "Apakah Anda yakin? Tindakan ini akan menghapus SEMUA data (booking, room, pengaturan, QRIS) secara permanen dan mengembalikan aplikasi ke kondisi awal seperti baru. Tindakan ini tidak dapat dibatalkan.", "Ya, Reset Semua", true);
+    if (!confirm) return;
+    
+    const m = modal(`<h3>Menghapus Data...</h3><p>Mohon tunggu, sedang menghapus semua data dari database.</p><progress style="width:100%"></progress>`, { sticky: true, wide: false });
+    
+    try {
+        const cols = ["bookings", "availability", "proofs", "lookups"];
+        for (const c of cols) {
+            const snap = await getDocs(collection(db, c));
+            if (!snap.empty) {
+                const docs = snap.docs;
+                for (let i = 0; i < docs.length; i += 500) {
+                    const batch = writeBatch(db);
+                    docs.slice(i, i + 500).forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                }
+            }
+        }
+        
+        try { await deleteDoc(doc(db, "config", "settings")); } catch(e) {}
+        try { await deleteDoc(doc(db, "config", "qris")); } catch(e) {}
+        
+        localStorage.removeItem("araya_mine");
+        localStorage.removeItem("araya_sub");
+        sessionStorage.clear();
+        
+        toast("Database berhasil di-reset. Memuat ulang...", "success");
+        setTimeout(() => location.reload(), 1500);
+    } catch (err) {
+        m.close();
+        toast("Gagal reset database: " + (err.message || err.code), "error");
+    }
 }
