@@ -1,27 +1,28 @@
 import { db, doc, setDoc } from "./fb.js";
-import { $, $$, esc, parseNum, normWA, icon, compressImage, qrSvg, toast, DEFAULT_SETTINGS, modal, now } from "./lib.js";
+import { $, $$, esc, fmtNum, parseNum, normWA, icon, compressImage, qrSvg, toast, DEFAULT_SETTINGS, modal, now } from "./lib.js";
 import { validateQris, decodeQrFromFile, makeDynamic } from "./qris.js";
 
-const roomRow = r => `<tr data-row>
+const roomRow = r => `<tr data-row data-orig="${esc(r.name)}">
   <td><input data-f="name" value="${esc(r.name)}" maxlength="30" style="min-width:110px"></td>
-  <td><input data-f="rate" inputmode="numeric" value="${r.rate || ""}" placeholder="0" style="width:90px"></td>
+  <td><input data-f="rate" data-money inputmode="numeric" value="${fmtNum(r.rate)}" placeholder="0" style="width:105px"></td>
+  <td><input data-f="minDurasi" inputmode="numeric" value="${r.minDurasi || 1}" style="width:60px"></td>
   <td><input data-f="baseCap" inputmode="numeric" value="${r.baseCap ?? 4}" style="width:60px"></td>
   <td><input data-f="maxCap" inputmode="numeric" value="${r.maxCap || ""}" placeholder="∞" style="width:60px"></td>
-  <td><input data-f="extraPrice" inputmode="numeric" value="${r.extraPrice || ""}" placeholder="0" style="width:90px"></td>
+  <td><input data-f="extraPrice" data-money inputmode="numeric" value="${fmtNum(r.extraPrice)}" placeholder="0" style="width:105px"></td>
   <td><input type="checkbox" data-f="active" ${r.active === false ? "" : "checked"}></td>
   <td><button class="btn btn-ghost btn-sm" data-delrow type="button">${icon("delete", 14)}</button></td>
 </tr>`;
 
 const lokBlock = (l, rms) => `<div class="lok-block" data-loksec="${esc(l)}">
-    <div class="lok-title">${icon("store", 20)} ${esc(l)}</div>
+    <div class="lok-title">${icon("store", 20)}<input data-lokname value="${esc(l)}" maxlength="30" placeholder="Nama cabang" aria-label="Nama cabang"></div>
     <h4 class="subsec-title">Room &amp; Tarif</h4>
     <div class="scroll-x"><table class="tbl" data-lok="${esc(l)}">
-        <thead><tr><th>Room</th><th>Tarif/jam</th><th>Kapasitas</th><th>Maks</th><th>+Orang/jam</th><th>Aktif</th><th></th></tr></thead>
+        <thead><tr><th>Room</th><th>Tarif/jam</th><th>Min jam</th><th>Kapasitas</th><th>Maks</th><th>+Orang/jam</th><th>Aktif</th><th></th></tr></thead>
         <tbody>${rms.map(roomRow).join("")}</tbody>
     </table></div>
     <button class="btn btn-ghost btn-sm" data-addroom="${esc(l)}" type="button" style="margin-top:12px">${icon("add", 14)} Tambah room</button>
 
-    <h4 class="subsec-title" style="margin-top:24px">QRIS ${esc(l)}</h4>
+    <h4 class="subsec-title" style="margin-top:24px">QRIS</h4>
     <p class="muted">Upload QRIS merchant cabang ini. Tersimpan otomatis.</p>
     <div class="muted" data-qinfo="${esc(l)}" style="margin-top:8px"></div>
     <div data-qprev="${esc(l)}"></div>
@@ -29,7 +30,7 @@ const lokBlock = (l, rms) => `<div class="lok-block" data-loksec="${esc(l)}">
     <div class="row-btns"><button class="btn btn-delete btn-sm" data-qdel="${esc(l)}" type="button">${icon("delete", 14)} Hapus QRIS</button></div>
 
     <div class="row-btns" style="margin-top:16px;border-top:1px dashed var(--border-subtle);padding-top:16px">
-        <button class="btn btn-delete btn-sm" data-removelok="${esc(l)}" type="button">${icon("delete_forever", 14)} Hapus cabang "${esc(l)}"</button>
+        <button class="btn btn-delete btn-sm" data-removelok="${esc(l)}" type="button">${icon("delete_forever", 14)} Hapus cabang ini</button>
     </div>
 </div>`;
 
@@ -41,7 +42,7 @@ const TPL_NAMES = {
     confirmed: "Konfirmasi Pembayaran"
 };
 
-function getDiff(oldSt, nextSt) {
+function getDiff(oldSt, nextSt, renames = {}, roomRenames = {}) {
     const diffs = [];
     if (oldSt.dpPercent !== nextSt.dpPercent) diffs.push(`DP default: ${oldSt.dpPercent}% → ${nextSt.dpPercent}%`);
     if (oldSt.holdMinutes !== nextSt.holdMinutes) diffs.push(`Batas bayar: ${oldSt.holdMinutes} mnt → ${nextSt.holdMinutes} mnt`);
@@ -51,29 +52,37 @@ function getDiff(oldSt, nextSt) {
     if (oldSt.minLeadMin !== nextSt.minLeadMin) diffs.push(`Minimal booking: ${oldSt.minLeadMin} mnt → ${nextSt.minLeadMin} mnt`);
     if (oldSt.maxDurasi !== nextSt.maxDurasi) diffs.push(`Durasi maksimal: ${oldSt.maxDurasi} jam → ${nextSt.maxDurasi} jam`);
     if (oldSt.micPrice !== nextSt.micPrice) diffs.push(`Harga mic: Rp ${oldSt.micPrice} → Rp ${nextSt.micPrice}`);
-    if (oldSt.addonPerHour !== nextSt.addonPerHour) diffs.push(`Biaya tambahan per jam: ${oldSt.addonPerHour ? "Ya" : "Tidak"} → ${nextSt.addonPerHour ? "Ya" : "Tidak"}`);
+    if (oldSt.addonPerHour !== nextSt.addonPerHour) diffs.push(`Orang tambahan dihitung per jam: ${oldSt.addonPerHour ? "Ya" : "Tidak"} → ${nextSt.addonPerHour ? "Ya" : "Tidak"}`);
+    if (!!oldSt.micPerHour !== !!nextSt.micPerHour) diffs.push(`Mic dihitung per jam: ${oldSt.micPerHour ? "Ya" : "Tidak"} → ${nextSt.micPerHour ? "Ya" : "Tidak"}`);
     if (oldSt.adminWA !== nextSt.adminWA) diffs.push(`WA Admin diperbarui`);
     if (oldSt.policy !== nextSt.policy) diffs.push(`Teks Kebijakan diperbarui`);
 
-    const addedLok = nextSt.lokasi.filter(l => !oldSt.lokasi.includes(l));
-    const removedLok = oldSt.lokasi.filter(l => !nextSt.lokasi.includes(l));
+    const back = Object.fromEntries(Object.entries(renames).map(([a, b]) => [b, a]));
+    const addedLok = nextSt.lokasi.filter(l => !oldSt.lokasi.includes(l) && !back[l]);
+    const removedLok = oldSt.lokasi.filter(l => !nextSt.lokasi.includes(l) && renames[l] === undefined);
+    Object.entries(renames).forEach(([a, b]) => diffs.push(`Ganti nama cabang: ${a} → ${b}`));
     addedLok.forEach(l => diffs.push(`Menambah cabang: ${l}`));
     removedLok.forEach(l => diffs.push(`Menghapus cabang: ${l}`));
 
     nextSt.lokasi.forEach(l => {
-        if (!oldSt.lokasi.includes(l)) return;
-        const oldRooms = oldSt.rooms[l] || [];
+        const ol = back[l] ?? l;
+        if (!oldSt.lokasi.includes(ol)) return;
+        const oldRooms = oldSt.rooms[ol] || [];
         const newRooms = nextSt.rooms[l] || [];
+        const ren = roomRenames[l] || {};
+        const renBack = Object.fromEntries(Object.entries(ren).map(([a, b]) => [b, a]));
 
-        const addedR = newRooms.filter(r => !oldRooms.find(o => o.name === r.name));
-        const removedR = oldRooms.filter(r => !newRooms.find(n => n.name === r.name));
+        Object.entries(ren).forEach(([a, b]) => diffs.push(`Cabang ${l}: ganti nama room ${a} → ${b}`));
+        const addedR = newRooms.filter(r => !oldRooms.find(o => o.name === (renBack[r.name] ?? r.name)));
+        const removedR = oldRooms.filter(o => ren[o.name] === undefined && !newRooms.find(n => n.name === o.name));
         addedR.forEach(r => diffs.push(`Cabang ${l}: tambah room ${r.name}`));
         removedR.forEach(r => diffs.push(`Cabang ${l}: hapus room ${r.name}`));
 
         newRooms.forEach(r => {
-            const o = oldRooms.find(x => x.name === r.name);
+            const o = oldRooms.find(x => x.name === (renBack[r.name] ?? r.name));
             if (o) {
                 if (o.rate !== r.rate) diffs.push(`${l} - ${r.name}: tarif berubah`);
+                if ((o.minDurasi || 1) !== r.minDurasi) diffs.push(`${l} - ${r.name}: minimal jam ${o.minDurasi || 1} → ${r.minDurasi}`);
                 if (o.baseCap !== r.baseCap) diffs.push(`${l} - ${r.name}: kapasitas berubah`);
                 if (o.maxCap !== r.maxCap) diffs.push(`${l} - ${r.name}: maksimal orang berubah`);
                 if (o.extraPrice !== r.extraPrice) diffs.push(`${l} - ${r.name}: +Orang/jam berubah`);
@@ -96,15 +105,16 @@ export function renderSettings(el, S, H) {
     let hol = [...(st.holidays || [])];
     S.dirty = false;
 
-    const num = (id, v, label, hint = "") => `<div class="form-group"><label>${label}</label><input id="${id}" inputmode="decimal" value="${v ?? ""}">${hint ? `<small class="hint" style="margin-top:4px">${hint}</small>` : ""}</div>`;
+    const num = (id, v, label, hint = "", money = false) => `<div class="form-group"><label>${label}</label><input id="${id}" ${money ? `data-money inputmode="numeric"` : `inputmode="decimal"`} value="${money ? fmtNum(v) : v ?? ""}">${hint ? `<small class="hint" style="margin-top:4px">${hint}</small>` : ""}</div>`;
 
     el.innerHTML = `
     <div class="form-card"><details class="set-sec"><summary>${icon("tune")} <span style="flex:1;text-align:left">Umum &amp; Kebijakan</span></summary><div class="form-grid">
       ${num("sDp", st.dpPercent, "DP default (%)")}${num("sHold", st.holdMinutes, "Batas bayar (menit)", "Setelah disetujui, slot ditahan sampai batas ini.")}
       ${num("sBuf", st.bufferMin, "Jeda antar sesi (menit)")}${num("sGrace", st.noShowGraceMin, "Toleransi telat (menit)")}
       ${num("sTtl", st.pendingTtlHours, "Permintaan kedaluwarsa (jam)")}${num("sLead", st.minLeadMin, "Minimal booking sebelum main (menit)")}
-      ${num("sMaxD", st.maxDurasi, "Durasi maksimal (jam)")}${num("sMic", st.micPrice, "Harga mic tambahan (Rp)")}
-      <div class="form-group full-width"><label class="check"><input type="checkbox" id="sPerHour" ${st.addonPerHour ? "checked" : ""}><span>Biaya orang tambahan &amp; mic dihitung <b>per jam</b> (tidak dicentang = sekali bayar)</span></label></div>
+      ${num("sMaxD", st.maxDurasi, "Durasi maksimal (jam)")}${num("sMic", st.micPrice, "Harga mic tambahan (Rp)", "", true)}
+      <div class="form-group full-width"><label class="check"><input type="checkbox" id="sPerHour" ${st.addonPerHour ? "checked" : ""}><span>Biaya orang tambahan dihitung <b>per jam</b> (tidak dicentang = sekali bayar)</span></label></div>
+      <div class="form-group full-width"><label class="check"><input type="checkbox" id="sMicPerHour" ${st.micPerHour ? "checked" : ""}><span>Biaya mic dihitung <b>per jam</b> (tidak dicentang = sekali bayar sampai sesi selesai)</span></label></div>
       <div class="form-group full-width"><label>WhatsApp admin</label><input id="sWa" inputmode="tel" value="${esc(st.adminWA || "")}" placeholder="08xxxxxxxxxx"></div>
       <div class="form-group full-width"><label>Kebijakan (tampil di halaman booking)</label><textarea id="sPolicy" rows="2">${esc(st.policy || "")}</textarea></div></div></details></div>
 
@@ -178,7 +188,7 @@ export function renderSettings(el, S, H) {
         const addroom = e.target.closest("[data-addroom]");
         if (addroom) {
             const tbl = $(`table[data-lok="${CSS.escape(addroom.dataset.addroom)}"] tbody`, el);
-            if (tbl) tbl.insertAdjacentHTML("beforeend", roomRow({ name: "", rate: 0, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }));
+            if (tbl) tbl.insertAdjacentHTML("beforeend", roomRow({ name: "", rate: 0, minDurasi: 1, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }));
             S.dirty = true;
             return;
         }
@@ -186,7 +196,8 @@ export function renderSettings(el, S, H) {
         if (removelok) {
             const l = removelok.dataset.removelok;
             if ($$("[data-loksec]", el).length <= 1) return toast("Minimal 1 cabang", "error");
-            if (!confirm(`Hapus cabang "${l}"?`)) return;
+            const cur = $("[data-lokname]", removelok.closest("[data-loksec]")).value.trim() || l;
+            if (!confirm(`Hapus cabang "${cur}"?`)) return;
             removelok.closest("[data-loksec]").remove();
             S.dirty = true;
             return;
@@ -246,11 +257,17 @@ export function renderSettings(el, S, H) {
     $("#setSave", el).onclick = async () => {
         const saveBtn = $("#setSave", el);
         const g = id => parseFloat(String($("#" + id, el).value).replace(",", ".")) || 0;
-        const nextLokasi = [], nextRooms = {};
+        const maxD = Math.min(24, Math.max(1, g("sMaxD") || 12));
+        const nextLokasi = [], nextRooms = {}, origKeys = [], moves = {}, renames = {}, roomRenames = {}, roomMoves = {};
         for (const sec of $$("[data-loksec]", el)) {
-            const l = sec.dataset.loksec;
+            const orig = sec.dataset.loksec, l = $("[data-lokname]", sec).value.trim();
+            if (!l) return toast("Nama cabang tidak boleh kosong", "error");
+            if (l.length > 30) return toast("Nama cabang maksimal 30 karakter", "error");
+            if (nextLokasi.includes(l)) return toast(`Nama cabang ganda: ${l}`, "error");
             nextLokasi.push(l);
-            const rows = $$(`table[data-lok="${CSS.escape(l)}"] tr[data-row]`, el), names = new Set();
+            origKeys.push(orig);
+            if (orig !== l) { moves[orig] = l; if (st.lokasi.includes(orig)) renames[orig] = l; }
+            const rows = $$(`table[data-lok="${CSS.escape(orig)}"] tr[data-row]`, el), names = new Set();
             nextRooms[l] = [];
             for (const tr of rows) {
                 const f = n => $(`[data-f=${n}]`, tr), name = f("name").value.trim();
@@ -258,25 +275,33 @@ export function renderSettings(el, S, H) {
                 if (name.length > 30) return toast(`Nama room "${name}" maksimal 30 karakter`, "error");
                 if (names.has(name)) return toast(`Nama room ganda di ${l}: ${name}`, "error");
                 names.add(name);
-                nextRooms[l].push({ name, rate: parseNum(f("rate").value), baseCap: parseInt(f("baseCap").value) || 1, maxCap: parseInt(f("maxCap").value) || 0, extraPrice: parseNum(f("extraPrice").value), active: f("active").checked });
+                const from = tr.dataset.orig;
+                if (from && from !== name && (st.rooms[orig] || []).some(r => r.name === from)) {
+                    (roomRenames[l] ??= {})[from] = name;
+                    (roomMoves[orig] ??= {})[from] = name;
+                }
+                const minDurasi = Math.max(1, parseInt(f("minDurasi").value) || 1);
+                if (minDurasi > maxD) return toast(`Minimal jam ${name} (${minDurasi}) melebihi durasi maksimal (${maxD} jam)`, "error");
+                nextRooms[l].push({ name, rate: parseNum(f("rate").value), minDurasi, baseCap: parseInt(f("baseCap").value) || 1, maxCap: parseInt(f("maxCap").value) || 0, extraPrice: parseNum(f("extraPrice").value), active: f("active").checked });
             }
             if (!nextRooms[l].length) return toast(`Cabang ${l} minimal punya 1 room`, "error");
         }
         if (!nextLokasi.length) return toast("Minimal 1 cabang", "error");
         const orphan = S.bookings.find(b => ["PENDING", "MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"].includes(b.status) && b.endMs > now()
-            && !(nextRooms[b.lokasi] || []).some(r => r.name === b.room));
-        if (orphan) return toast(`Masih ada booking aktif di ${orphan.lokasi} · ${orphan.room}. Room/cabang itu tidak bisa dihapus atau diganti nama sebelum bookingnya selesai.`, "error");
+            && (!origKeys.includes(b.lokasi) || renames[b.lokasi] !== undefined || roomMoves[b.lokasi]?.[b.room] !== undefined
+                || !(nextRooms[b.lokasi] || []).some(r => r.name === b.room)));
+        if (orphan) return toast(`Masih ada booking aktif di ${orphan.lokasi} · ${orphan.room}. Cabang atau room itu tidak bisa dihapus atau diganti nama sebelum bookingnya selesai.`, "error");
         const next = {
             ...st, dpPercent: g("sDp"), holdMinutes: g("sHold"), bufferMin: g("sBuf"), noShowGraceMin: g("sGrace"),
-            pendingTtlHours: g("sTtl"), minLeadMin: g("sLead"), maxDurasi: Math.min(24, Math.max(1, g("sMaxD") || 12)),
-            micPrice: parseNum($("#sMic", el).value), addonPerHour: $("#sPerHour", el).checked,
+            pendingTtlHours: g("sTtl"), minLeadMin: g("sLead"), maxDurasi: maxD,
+            micPrice: parseNum($("#sMic", el).value), addonPerHour: $("#sPerHour", el).checked, micPerHour: $("#sMicPerHour", el).checked,
             adminWA: $("#sWa", el).value.trim() ? normWA($("#sWa", el).value) : "", policy: $("#sPolicy", el).value.trim(),
-            holidays: hol, lokasi: nextLokasi, rooms: nextRooms, templates: {}
+            holidays: hol.map(h => moves[h.lokasi] ? { ...h, lokasi: moves[h.lokasi] } : h), lokasi: nextLokasi, rooms: nextRooms, templates: {}
         };
         if (next.dpPercent < 1 || next.dpPercent > 100) return toast("DP harus 1–100%", "error");
         $$("[data-tpl]", el).forEach(t => next.templates[t.dataset.tpl] = t.value);
 
-        const diffs = getDiff(st, next);
+        const diffs = getDiff(st, next, renames, roomRenames);
         if (!diffs.length) {
             S.dirty = false;
             toast("Tidak ada perubahan", "info");
@@ -311,17 +336,23 @@ export function renderSettings(el, S, H) {
                 Object.assign(S.st, next);
                 S.needSeed = false;
 
-                const removedLok = st.lokasi.filter(l => !nextLokasi.includes(l));
-                if (removedLok.some(l => S.qris[l])) {
-                    removedLok.forEach(l => { if (S.qris[l]) delete S.qris[l]; });
-                    await setDoc(doc(db, "config", "qris"), S.qris);
+                const nq = {};
+                Object.keys(S.qris).forEach(k => { if (origKeys.includes(k)) nq[moves[k] ?? k] = S.qris[k]; });
+                if (JSON.stringify(nq) !== JSON.stringify(S.qris)) {
+                    await setDoc(doc(db, "config", "qris"), nq);
+                    S.qris = nq;
                 }
+                S.f.lokasi = renames[S.f.lokasi] ?? (nextLokasi.includes(S.f.lokasi) ? S.f.lokasi : "ALL");
                 toast("Pengaturan tersimpan", "success");
 
                 if (S.pendingTab && H.switchTab) {
                     const t = S.pendingTab;
                     S.pendingTab = null;
                     H.switchTab(t);
+                } else {
+                    const open = $$("details.set-sec", el).map(d => d.open);
+                    renderSettings(el, S, H);
+                    $$("details.set-sec", el).forEach((d, i) => { d.open = !!open[i]; });
                 }
             } catch (err) {
                 S.dirty = true;

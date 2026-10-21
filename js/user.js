@@ -148,8 +148,11 @@ function viewForm() {
         const oi = $("#f-orang"), cap = roomCfg(ST, $("#f-lokasi").value, $("#f-room").value);
         oi.max = (cap && cap.maxCap) || 50;
         if (+oi.value > +oi.max) oi.value = oi.max;
+        const di = $("#f-durasi"), minD = (cap && cap.minDurasi) || 1;
+        di.min = minD;
+        if (+di.value < minD) { di.value = minD; jam = null; }
         const v = rd(), r = roomCfg(ST, v.lokasi, v.room);
-        $("#f-roomhint").textContent = r ? `Kapasitas ${r.baseCap} orang${r.maxCap ? `, maksimal ${r.maxCap}` : ""}. Lebih dari kapasitas dikenakan biaya tambahan per orang.` : "";
+        $("#f-roomhint").textContent = r ? `Kapasitas ${r.baseCap} orang${r.maxCap ? `, maksimal ${r.maxCap}` : ""}.${minD > 1 ? ` Minimal sewa ${minD} jam.` : ""} Lebih dari kapasitas dikenakan biaya tambahan per orang.` : "";
         const oh = $("#f-orangHint");
         if (r) {
             const x = Math.max(0, v.orang - r.baseCap);
@@ -161,7 +164,7 @@ function viewForm() {
         est.innerHTML = r.rate ? `
           <div class="kv"><span>Room ${v.durasi} jam</span><b>${rupiah(p.base)}</b></div>
           ${p.extraN ? `<div class="kv"><span>${p.extraN} orang tambahan</span><b>${rupiah(p.extra)}</b></div>` : ""}
-          ${v.mic ? `<div class="kv"><span>${v.mic} mic</span><b>${rupiah(p.micT)}</b></div>` : ""}
+          ${v.mic ? `<div class="kv"><span>${v.mic} mic${ST.micPerHour ? ` × ${v.durasi} jam` : ""}</span><b>${rupiah(p.micT)}</b></div>` : ""}
           <div class="kv"><span>Estimasi total</span><b>${rupiah(p.total)}</b></div>
           <div class="kv highlight"><span>DP yang perlu dibayar (${ST.dpPercent}%)</span><b>${rupiah(p.dp)}</b></div>
           <small class="hint">Angka final dikonfirmasi admin.</small>` : `<small class="hint">Tarif akan dikonfirmasi admin saat booking disetujui.</small>`;
@@ -218,6 +221,7 @@ function viewForm() {
         if (!validWA(v.wa)) return toast("Nomor WhatsApp tidak valid (contoh 08123456789)", "error");
         if (!r || !v.tanggal || !v.jam || !v.durasi) return toast("Lengkapi lokasi, room, tanggal, durasi, dan jam mulai", "error");
         if (r.maxCap && v.orang > r.maxCap) return toast(`Maksimal ${r.maxCap} orang untuk ${r.name}`, "error");
+        if (v.durasi < (r.minDurasi || 1)) return toast(`Minimal sewa ${r.name} adalah ${r.minDurasi} jam`, "error");
         if (recentSubmits().length >= 5) return toast("Terlalu banyak pengajuan dalam 1 jam. Coba lagi nanti atau hubungi admin.", "error");
         const s = toMs(v.tanggal, v.jam), e2 = s + v.durasi * H;
         if (s < now() + ST.minLeadMin * 60000) return toast("Jam itu sudah terlewat, pilih jam lain", "error");

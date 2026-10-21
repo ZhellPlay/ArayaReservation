@@ -3,7 +3,7 @@ import {
     GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, writeBatch
 } from "./fb.js";
 import {
-    $, $$, esc, toast, modal, confirmBox, setBusy, copyText, icon, rupiah, parseNum, normWA, randSecret, genKode, lookupId, normKode,
+    $, $$, esc, toast, modal, confirmBox, setBusy, copyText, icon, rupiah, fmtNum, parseNum, normWA, randSecret, genKode, lookupId, normKode,
     witaDate, witaTime, witaDateTimeInput, fromDateTimeInput, addDays, fmtDate, fmtDT, tsMs, now, syncClock, STATUS, HOLDING, pill, effStatus,
     mergeSettings, roomCfg, calcPrice, fillTpl, waLink, bookingLink, siteLink, startBackground
 } from "./lib.js";
@@ -405,7 +405,7 @@ async function verifyModal(b) {
 
 function receiveModal(b) {
     const m = modal(`<h3>${icon("payments")} Terima DP</h3><p>${esc(b.nama)} · DP seharusnya ${rupiah(b.dpDue)}</p>
-      <div class="form-grid"><div class="form-group"><label>Nominal diterima</label><input id="dNom" inputmode="numeric" value="${b.dpDue || ""}"></div>
+      <div class="form-grid"><div class="form-group"><label>Nominal diterima</label><input id="dNom" data-money inputmode="numeric" value="${fmtNum(b.dpDue)}"></div>
       <div class="form-group"><label>Cara</label><select id="dMet"><option value="CASH" ${b.dpMethod === "CASH" ? "selected" : ""}>Tunai</option><option value="QRIS" ${b.dpMethod === "QRIS" ? "selected" : ""}>QRIS / transfer</option></select></div></div>
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-ok" id="dGo">Konfirmasi</button></div>`);
     $("#dGo", m.el).onclick = async () => {
@@ -526,7 +526,7 @@ function manualModal(pre = {}) {
       <div class="form-group"><label>Mulai (WITA)</label><input type="datetime-local" id="mDt" value="${witaDateTimeInput(now())}"></div><div class="form-group"><label>Durasi (jam)</label><input type="number" step="0.5" min="0.5" id="mDur" value="1"></div>
       <div class="form-group full-width"><label id="mNamaL">Nama</label><input id="mNama" placeholder="Nama / label"></div>
       <div class="form-group" data-m="u"><label>WhatsApp</label><input id="mWa" inputmode="tel"></div><div class="form-group" data-m="u"><label>Orang</label><input type="number" id="mOrg" value="2" min="1"></div>
-      <div class="form-group" data-m="u"><label>Total (opsional)</label><input id="mTot" inputmode="numeric"></div><div class="form-group" data-m="u"><label>DP diterima</label><input id="mDp" inputmode="numeric" placeholder="0"></div></div>
+      <div class="form-group" data-m="u"><label>Total (opsional)</label><input id="mTot" data-money inputmode="numeric"></div><div class="form-group" data-m="u"><label>DP diterima</label><input id="mDp" data-money inputmode="numeric" placeholder="0"></div></div>
       <label class="check" style="margin-top:12px"><input type="checkbox" id="mForce"><span>Paksa walau bentrok <small class="muted">(kenyataan di lapangan menang; booking yang bentrok akan ditandai)</small></span></label>
       <div class="modal-actions" style="margin-top:20px"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-save" id="mGo" style="flex:0 0 auto;padding:12px 22px">Simpan</button></div>`);
     const fill = () => { $("#mRoom", m.el).innerHTML = (S.st.rooms[$("#mLok", m.el).value] || []).map(r => `<option ${r.name === pre.room ? "selected" : ""}>${esc(r.name)}</option>`).join(""); };

@@ -39,6 +39,7 @@ export function fmtCountdown(ms) {
 }
 
 export const rupiah = n => "Rp " + new Intl.NumberFormat("id-ID").format(Math.round(n || 0));
+export const fmtNum = n => n ? new Intl.NumberFormat("id-ID").format(Math.round(n)) : "";
 export const parseNum = s => parseInt(String(s ?? "").replace(/\D/g, ""), 10) || 0;
 
 export function normWA(s) {
@@ -98,7 +99,7 @@ const DEF_LOK = "CABANG 1";
 export const DEFAULT_SETTINGS = {
     lokasi: [DEF_LOK],
     rooms: { [DEF_LOK]: mkRooms() },
-    micPrice: 0, addonPerHour: true,
+    micPrice: 0, addonPerHour: true, micPerHour: false,
     dpPercent: 50, holdMinutes: 30, bufferMin: 0, noShowGraceMin: 15, pendingTtlHours: 24, minLeadMin: 15, maxDurasi: 12,
     adminWA: "", holidays: [], policy: "DP hangus jika batal setelah pembayaran atau tidak datang.",
     templates: {
@@ -122,7 +123,7 @@ export function calcPrice(st, room, durasi, orang, mic) {
     if (!room) return { base: 0, extraN: 0, extra: 0, micT: 0, total: 0, dp: 0 };
     const mult = st.addonPerHour ? durasi : 1;
     const extraN = Math.max(0, orang - (room.baseCap || 0));
-    const base = (room.rate || 0) * durasi, extra = extraN * (room.extraPrice || 0) * mult, micT = (mic || 0) * (st.micPrice || 0) * mult;
+    const base = (room.rate || 0) * durasi, extra = extraN * (room.extraPrice || 0) * mult, micT = (mic || 0) * (st.micPrice || 0) * (st.micPerHour ? durasi : 1);
     const total = base + extra + micT;
     const dp = total > 0 ? Math.round(total * (st.dpPercent || 50) / 100) : 0;
     return { base, extraN, extra, micT, total, dp };
@@ -233,3 +234,19 @@ export function startBackground() {
         requestAnimationFrame(draw);
     })();
 }
+
+function formatMoneyInput(el) {
+    const caret = el.selectionStart ?? el.value.length;
+    const before = el.value.slice(0, caret).replace(/\D/g, "").length;
+    const digits = el.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+    const out = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    if (out === el.value) return;
+    el.value = out;
+    let pos = 0, seen = 0;
+    while (pos < out.length && seen < before) { if (/\d/.test(out[pos])) seen++; pos++; }
+    el.setSelectionRange(pos, pos);
+}
+
+document.addEventListener("input", e => {
+    if (e.target.matches?.("input[data-money]")) formatMoneyInput(e.target);
+});
