@@ -19,22 +19,32 @@ const lokBlock = (l, rms) => `<div class="lok-block" data-loksec="${esc(l)}">
         <thead><tr><th>Room</th><th>Tarif/jam</th><th>Kapasitas</th><th>Maks</th><th>+Orang/jam</th><th>Aktif</th><th></th></tr></thead>
         <tbody>${rms.map(roomRow).join("")}</tbody>
     </table></div>
-    <button class="btn btn-ghost btn-sm" data-addroom="${esc(l)}" type="button">${icon("add", 14)} Tambah room</button>
-    <h4 class="subsec-title">QRIS ${esc(l)}</h4>
+    <button class="btn btn-ghost btn-sm" data-addroom="${esc(l)}" type="button" style="margin-top:12px">${icon("add", 14)} Tambah room</button>
+    
+    <h4 class="subsec-title" style="margin-top:24px">QRIS ${esc(l)}</h4>
     <p class="muted">Upload QRIS merchant cabang ini. Tersimpan otomatis.</p>
-    <div class="muted" data-qinfo="${esc(l)}"></div>
+    <div class="muted" data-qinfo="${esc(l)}" style="margin-top:8px"></div>
     <div data-qprev="${esc(l)}"></div>
     <input type="file" accept="image/*" data-qfile="${esc(l)}" style="margin-top:8px">
     <div class="row-btns"><button class="btn btn-delete btn-sm" data-qdel="${esc(l)}" type="button">${icon("delete", 14)} Hapus QRIS</button></div>
-    <div class="row-btns" style="margin-top:14px;border-top:1px dashed var(--border-subtle);padding-top:14px">
+    
+    <div class="row-btns" style="margin-top:16px;border-top:1px dashed var(--border-subtle);padding-top:16px">
         <button class="btn btn-delete btn-sm" data-removelok="${esc(l)}" type="button">${icon("delete_forever", 14)} Hapus cabang "${esc(l)}"</button>
     </div>
 </div>`;
 
+const TPL_NAMES = {
+    approve: "Persetujuan (QRIS)",
+    approveCash: "Persetujuan (Tunai)",
+    reject: "Penolakan",
+    remind: "Pengingat Pembayaran",
+    confirmed: "Konfirmasi Pembayaran"
+};
+
 export function renderSettings(el, S, H) {
     const st = S.st;
     let hol = [...(st.holidays || [])];
-    const num = (id, v, label, hint = "") => `<div class="form-group"><label>${label}</label><input id="${id}" inputmode="decimal" value="${v ?? ""}">${hint ? `<small class="hint">${hint}</small>` : ""}</div>`;
+    const num = (id, v, label, hint = "") => `<div class="form-group"><label>${label}</label><input id="${id}" inputmode="decimal" value="${v ?? ""}">${hint ? `<small class="hint" style="margin-top:4px">${hint}</small>` : ""}</div>`;
 
     el.innerHTML = `
     <div class="form-card"><details open class="set-sec"><summary>${icon("tune")} Umum &amp; Kebijakan</summary><div class="form-grid">
@@ -47,7 +57,7 @@ export function renderSettings(el, S, H) {
       <div class="form-group full-width"><label>Kebijakan (tampil di halaman booking)</label><textarea id="sPolicy" rows="2">${esc(st.policy || "")}</textarea></div></div></details></div>
 
     <div class="form-card"><details open class="set-sec"><summary>${icon("store")} Cabang (Lokasi)</summary>
-      <p class="muted">Default 1 cabang dengan 1 room. Tambah atau hapus sesuai kebutuhan. Minimal 1 cabang dan 1 room per cabang.</p>
+      <p class="muted" style="margin-bottom:16px">Default 1 cabang dengan 1 room. Tambah atau hapus sesuai kebutuhan. Minimal 1 cabang dan 1 room per cabang.</p>
       <div id="lokList">${st.lokasi.map(l => lokBlock(l, st.rooms[l] || [])).join("")}</div>
       <div class="add-lok">
         <input id="lokNew" placeholder="Nama cabang baru (mis. GAMBUT)">
@@ -56,21 +66,30 @@ export function renderSettings(el, S, H) {
     </details></div>
 
     <div class="form-card"><details class="set-sec"><summary>${icon("event_busy")} Hari Libur / Tutup</summary>
-      <p class="muted">Tanggal tutup tidak bisa dipilih pelanggan. Untuk menutup satu room di jam tertentu, pakai "Blokir" di tab Room Hari Ini.</p>
+      <p class="muted" style="margin-bottom:16px">Tanggal tutup tidak bisa dipilih pelanggan.</p>
       <div id="holList"></div>
-      <div class="form-grid" style="margin-top:10px"><div class="form-group"><label>Tanggal</label><input type="date" id="hDate"></div>
+      <div class="form-grid" style="margin-top:16px"><div class="form-group"><label>Tanggal</label><input type="date" id="hDate"></div>
       <div class="form-group"><label>Lokasi</label><select id="hLok"><option value="ALL">Semua lokasi</option>${st.lokasi.map(l => `<option>${esc(l)}</option>`).join("")}</select></div>
       <div class="form-group full-width"><label>Alasan</label><input id="hWhy" placeholder="mis. HUT Araya"></div></div>
-      <button class="btn btn-ghost" id="hAdd" type="button">${icon("add", 16)} Tambah libur</button></details></div>
+      <button class="btn btn-ghost" id="hAdd" type="button" style="margin-top:12px">${icon("add", 16)} Tambah libur</button></details></div>
 
     <div class="form-card"><details class="set-sec"><summary>${icon("template_add")} Template Pesan WhatsApp</summary>
-      <p class="muted">Placeholder: {nama} {lokasi} {room} {tanggal} {jam} {nominal} {deadline} {link} {kode} {alasan} {site}</p>
-      ${Object.keys(DEFAULT_SETTINGS.templates).map(k => `<div class="form-group" style="margin-bottom:10px"><label>${k}</label><textarea data-tpl="${k}" rows="4">${esc(st.templates[k])}</textarea></div>`).join("")}</details></div>
+      <div class="est" style="margin-bottom:20px; border-color:var(--border-medium)">
+        <b>Variabel yang tersedia:</b><br>
+        <span class="muted" style="line-height:1.8; word-break:break-word; display:inline-block; margin-top:6px">{nama} · {lokasi} · {room} · {tanggal} · {jam} · {nominal} · {deadline} · {link} · {kode} · {alasan} · {site}</span>
+      </div>
+      <div class="form-grid" style="grid-template-columns: 1fr; gap:20px;">
+        ${Object.keys(DEFAULT_SETTINGS.templates).map(k => `
+          <div class="form-group">
+            <label style="color:var(--accent-1); font-size:12px; letter-spacing:1px">${TPL_NAMES[k] || k}</label>
+            <textarea data-tpl="${k}" rows="5" style="font-size:14px; line-height:1.6; resize:vertical;">${esc(st.templates[k])}</textarea>
+          </div>`).join("")}
+      </div></details></div>
 
     <button class="btn btn-save btn-block" id="setSave">${icon("save")} Simpan Pengaturan</button>
 
     <div class="form-card"><details class="set-sec"><summary>${icon("build")} Perawatan Data</summary>
-      <p class="muted">Kuota gratis Firebase terbatas. Ekspor dulu, lalu bersihkan booking lama (&gt; 30 hari).</p>
+      <p class="muted" style="margin-bottom:16px">Ekspor dulu, lalu bersihkan booking lama (&gt; 30 hari) untuk menghemat kuota Firebase.</p>
       <div class="row-btns"><button class="btn btn-ghost" id="mExp">${icon("download", 16)} Ekspor CSV</button><button class="btn btn-delete" id="mClean">${icon("delete_sweep", 16)} Bersihkan data lama</button></div></details></div>`;
 
     const drawQ = () => $$("[data-loksec]", el).forEach(sec => {
@@ -79,14 +98,14 @@ export function renderSettings(el, S, H) {
         const prevEl = $(`[data-qprev="${CSS.escape(l)}"]`, sec);
         if (infoEl) infoEl.textContent = q ? `Tersimpan: ${q.merchant || "(tanpa nama)"}` : "Belum ada QRIS";
         if (prevEl) prevEl.innerHTML = q ? (() => {
-            try { return `<div class="qris-prev">${qrSvg(makeDynamic(q.payload, 1000))}</div><small class="hint">Contoh QR Rp 1.000 (hanya tes, jangan dibayar)</small>`; }
+            try { return `<div class="qris-prev">${qrSvg(makeDynamic(q.payload, 1000))}</div><small class="hint" style="display:block; margin-top:6px">Contoh QR Rp 1.000 (hanya tes, jangan dibayar)</small>`; }
             catch (e) { return ""; }
         })() : "";
     });
 
     const drawHol = () => {
         $("#holList", el).innerHTML = hol.length
-            ? hol.sort((a, b) => a.date.localeCompare(b.date)).map((h, i) => `<div class="kv"><span>${esc(h.date)} · ${esc(h.lokasi === "ALL" ? "Semua" : h.lokasi)}</span><b>${esc(h.alasan || "-")} <button class="btn btn-ghost btn-sm" data-hdel="${i}" type="button">${icon("close", 12)}</button></b></div>`).join("")
+            ? hol.sort((a, b) => a.date.localeCompare(b.date)).map((h, i) => `<div class="kv"><span>${esc(h.date)} · ${esc(h.lokasi === "ALL" ? "Semua" : h.lokasi)}</span><b>${esc(h.alasan || "-")} <button class="btn btn-ghost btn-sm" data-hdel="${i}" type="button" style="padding:4px; min-height:24px;">${icon("close", 14)}</button></b></div>`).join("")
             : `<p class="muted">Belum ada hari libur.</p>`;
         $$("[data-hdel]", el).forEach(b => b.onclick = () => { hol.splice(+b.dataset.hdel, 1); drawHol(); });
     };
