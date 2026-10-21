@@ -264,6 +264,9 @@ label.check input[type="checkbox"] { margin-top: 1px; }
 .qris-prev { max-width: 160px; background: #fff; padding: 6px; }
 .login-box { max-width: 420px; margin: 40px auto; text-align: center; }
 
+/* FIX: Z-index Toast dinaikkan drastis agar selalu di atas modal */
+.toast { z-index: 9999999 !important; }
+
 @media (max-width: 480px) {
     .steps-intro { gap: var(--space-sm); }
     .nominal { font-size: 24px; }
