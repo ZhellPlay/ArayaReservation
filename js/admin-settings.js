@@ -267,7 +267,13 @@ export function renderSettings(el, S, H) {
         const diffs = getDiff(st, next);
         if (!diffs.length) {
             S.dirty = false;
-            return toast("Tidak ada perubahan", "info");
+            toast("Tidak ada perubahan", "info");
+            if (S.pendingTab && H.switchTab) {
+                const t = S.pendingTab;
+                S.pendingTab = null;
+                H.switchTab(t);
+            }
+            return;
         }
 
         const m = modal(`
@@ -286,12 +292,12 @@ export function renderSettings(el, S, H) {
         
         $("#confirmSave", m.el).onclick = async () => {
             m.close();
+            S.dirty = false;
             e.currentTarget.disabled = true;
             try {
                 await setDoc(doc(db, "config", "settings"), next);
                 Object.assign(S.st, next);
                 S.needSeed = false;
-                S.dirty = false;
                 
                 const removedLok = st.lokasi.filter(l => !nextLokasi.includes(l));
                 if (removedLok.some(l => S.qris[l])) {
@@ -299,7 +305,16 @@ export function renderSettings(el, S, H) {
                     await setDoc(doc(db, "config", "qris"), S.qris);
                 }
                 toast("Pengaturan tersimpan", "success");
-            } catch (err) { toast("Gagal menyimpan: " + (err.code || err.message), "error"); }
+                
+                if (S.pendingTab && H.switchTab) {
+                    const t = S.pendingTab;
+                    S.pendingTab = null;
+                    H.switchTab(t);
+                }
+            } catch (err) {
+                S.dirty = true;
+                toast("Gagal menyimpan: " + (err.code || err.message), "error");
+            }
             e.currentTarget.disabled = false;
         };
     };

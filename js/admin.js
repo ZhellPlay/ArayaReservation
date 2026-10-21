@@ -11,7 +11,7 @@ import { applyTx } from "./avail.js";
 import { renderSettings } from "./admin-settings.js";
 
 const H = 3600000, root = $("#root");
-export const S = { st: mergeSettings(null), qris: {}, bookings: [], byBid: new Map(), tab: "inbox", f: { lokasi: "ALL", status: "AKTIF", day: "ALL", sort: "main", q: "" }, hist: 3, dirty: false };
+export const S = { st: mergeSettings(null), qris: {}, bookings: [], byBid: new Map(), tab: "inbox", f: { lokasi: "ALL", status: "AKTIF", day: "ALL", sort: "main", q: "" }, hist: 3, dirty: false, pendingTab: null };
 let unsubB = null, firstSnap = true, scanStream = null;
 
 const bufMs = () => (S.st.bufferMin || 0) * 60000;
@@ -102,6 +102,7 @@ function renderTabs() {
 
 function setTab(t) {
     if (S.tab === "settings" && t !== "settings" && S.dirty) {
+        S.pendingTab = t;
         const m = modal(`
             <div class="modal-icon" style="background:var(--warning-soft); color:var(--warning); border-color:var(--warning-border)"><span class="material-icons-round">warning</span></div>
             <h3>Perubahan Belum Disimpan</h3>
@@ -113,6 +114,7 @@ function setTab(t) {
         `, { sticky: true, wide: false });
         $("#btnDiscard", m.el).onclick = () => {
             S.dirty = false;
+            S.pendingTab = null;
             m.close();
             setTab(t);
         };
@@ -139,7 +141,7 @@ function setTab(t) {
     $("#fQ")?.addEventListener("input", e => { S.f.q = e.target.value; renderBody(); });
     $("#btnFilter")?.addEventListener("click", filterModal);
 
-    if (t === "settings") renderSettings($("#body"), S, { toast, reload: async () => { const s = await getDoc(doc(db, "config", "settings")); if (s.exists()) S.st = mergeSettings(s.data()); }, exportCsv, cleanup });
+    if (t === "settings") renderSettings($("#body"), S, { toast, reload: async () => { const s = await getDoc(doc(db, "config", "settings")); if (s.exists()) S.st = mergeSettings(s.data()); }, exportCsv, cleanup, switchTab: setTab });
     else if (t === "scan") renderScan(); else renderBody();
 }
 
