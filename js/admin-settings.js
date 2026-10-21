@@ -293,7 +293,6 @@ export function renderSettings(el, S, H) {
         $("#confirmSave", m.el).onclick = async () => {
             m.close();
             S.dirty = false;
-            e.currentTarget.disabled = true;
             try {
                 await setDoc(doc(db, "config", "settings"), next);
                 Object.assign(S.st, next);
@@ -315,7 +314,6 @@ export function renderSettings(el, S, H) {
                 S.dirty = true;
                 toast("Gagal menyimpan: " + (err.code || err.message), "error");
             }
-            e.currentTarget.disabled = false;
         };
     };
 }
