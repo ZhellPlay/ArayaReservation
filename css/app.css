@@ -57,7 +57,7 @@ h3 {
     padding: var(--space-xl);
     margin-bottom: var(--space-lg);
     backdrop-filter: blur(20px);
-    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+    clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
 }
 .panel.ok { border-left-color: var(--success); }
 .panel.bad { border-left-color: var(--danger); }
@@ -225,10 +225,27 @@ label.check input[type="checkbox"] { margin-top: 1px; }
 .modal-card.wide > p { text-align: left; }
 .modal-card.wide .form-grid { margin: var(--space-md) 0; }
 
-.scan-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-md); margin-top: var(--space-md); }
-.scan-row .btn { flex: 0 0 auto; }
-.scan-row .form-group { flex: 1 1 120px; min-width: 0; margin: 0; }
-#scanToggle, #scanQ { min-height: 50px; }
+/* Penyesuaian Divider Text untuk Scan QR */
+.divider-text {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin: var(--space-xl) 0 var(--space-md);
+}
+.divider-text::before, .divider-text::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-subtle);
+}
+.divider-text span {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
 .scan-wrap { position: relative; max-width: 420px; margin: var(--space-lg) auto 0; background: #000; }
 .scan-wrap video { width: 100%; display: block; max-height: 60vh; max-height: 60dvh; object-fit: cover; }
 .scan-wrap::after {
