@@ -80,6 +80,7 @@ body {
     color: var(--text-primary);
     line-height: 1.5;
     min-height: 100vh;
+    min-height: 100dvh;
     overflow-x: hidden;
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -100,7 +101,11 @@ body::-webkit-scrollbar { display: none; }
     z-index: 1;
     max-width: 1100px;
     margin: 0 auto;
-    padding: var(--app-padding-y) var(--app-padding-x) 60px;
+    padding:
+        calc(var(--app-padding-y) + env(safe-area-inset-top))
+        max(var(--app-padding-x), env(safe-area-inset-right))
+        calc(60px + env(safe-area-inset-bottom))
+        max(var(--app-padding-x), env(safe-area-inset-left));
 }
 
 .header {
@@ -354,7 +359,7 @@ input[type="number"] { -moz-appearance: textfield; }
 
 .booking-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(var(--card-min-w), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--card-min-w)), 1fr));
     gap: var(--space-lg);
 }
 
@@ -368,10 +373,12 @@ input[type="number"] { -moz-appearance: textfield; }
     clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
 }
 
-.booking-card:hover {
-    border-color: var(--accent-border);
-    filter: drop-shadow(var(--shadow-card)) drop-shadow(0 0 15px rgba(139, 92, 246, 0.2));
-    transform: translateY(-2px);
+@media (hover: hover) {
+    .booking-card:hover {
+        border-color: var(--accent-border);
+        filter: drop-shadow(var(--shadow-card)) drop-shadow(0 0 15px rgba(139, 92, 246, 0.2));
+        transform: translateY(-2px);
+    }
 }
 
 .booking-card-header {
@@ -397,7 +404,7 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 
 .detail-item .material-icons-round { font-size: 16px; color: var(--accent-1); flex-shrink: 0; }
-.detail-item .val { color: #fff; font-weight: 500; }
+.detail-item .val { color: #fff; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
 
 .divider { height: 1px; background: var(--border-subtle); margin-bottom: var(--space-lg); }
 
@@ -406,13 +413,20 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 .empty-state .material-icons-round { font-size: 48px; margin-bottom: var(--space-md); opacity: 0.3; }
 
+.toast-stack {
+    position: fixed; z-index: 9999999; pointer-events: none;
+    top: calc(var(--space-xl) + env(safe-area-inset-top)); right: max(var(--space-xl), env(safe-area-inset-right));
+    width: min(380px, calc(100vw - 28px));
+    display: flex; flex-direction: column; gap: var(--space-sm);
+}
+
 .toast {
-    position: fixed; top: var(--space-xl); right: var(--space-xl);
-    min-width: 280px; padding: 14px var(--space-xl); color: #fff;
+    position: relative; pointer-events: auto;
+    padding: 14px var(--space-xl); color: #fff;
     font-family: var(--font-body); font-size: 14px; font-weight: 500;
     display: flex; align-items: center; gap: var(--space-md);
     box-shadow: var(--shadow-toast); animation: toastIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 9999; backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
 }
 .toast.success { background: rgba(16, 185, 129, 0.9); border: 1px solid var(--success-border); }
@@ -436,10 +450,10 @@ input[type="number"] { -moz-appearance: textfield; }
 
 .modal-card {
     background: var(--bg-card); border: 1px solid var(--border-subtle); border-top: 3px solid var(--danger);
-    padding: 30px; width: 100%; max-width: 400px; text-align: center;
+    padding: 30px; width: 100%; max-width: 400px; text-align: center; overscroll-behavior: contain;
     filter: drop-shadow(var(--shadow-card)); transform: scale(0.9) translateY(20px); transition: var(--transition);
     clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
-    max-height: calc(100vh - var(--space-2xl)); overflow-y: auto;
+    max-height: calc(100vh - var(--space-2xl)); max-height: calc(100dvh - var(--space-2xl)); overflow-y: auto;
 }
 .modal-overlay.active .modal-card { transform: scale(1) translateY(0); }
 
@@ -462,11 +476,11 @@ input[type="number"] { -moz-appearance: textfield; }
 @keyframes pageSlideIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (max-width: 768px) {
-    .app { padding: var(--space-lg) 14px 40px; }
+    .app { --app-padding-x: 14px; --app-padding-y: var(--space-lg); }
     .header { padding: var(--space-xl) 10px; margin-bottom: var(--space-xl); }
     .form-card { padding: var(--space-xl) var(--space-lg); }
     .booking-details { grid-template-columns: 1fr; }
-    .toast { left: 14px; right: 14px; min-width: unset; top: var(--space-md); }
+    .toast-stack { left: 14px; right: 14px; width: auto; top: calc(var(--space-md) + env(safe-area-inset-top)); }
     .modal-card { padding: var(--space-xl); }
 }
 
