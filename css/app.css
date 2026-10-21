@@ -12,6 +12,8 @@ h3 {
     font-size: 16px;
     display: flex;
     align-items: center;
+    justify-content: center;
+    text-align: center;
     gap: var(--space-sm);
     margin-bottom: var(--space-sm);
     font-weight: 700;
@@ -206,20 +208,17 @@ label.check input[type="checkbox"] { margin-top: 1px; }
 
 .bk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-lg); }
 .booking-card.hot { border-left-color: var(--warning); }
-.booking-card h3 { margin: 0; font-size: 17px; }
+.booking-card h3 { margin: 0; font-size: 17px; justify-content: flex-start; text-align: left; }
 .booking-card .sub { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
 
 .act { display: flex; flex-wrap: wrap; gap: 10px; }
 .act .btn { padding: 10px 16px; font-size: 13px; }
 
-/* PERBAIKAN: Center align khusus untuk teks di dalam modal */
 .modal-card.wide { width: min(560px, 94vw); max-height: 90vh; overflow-y: auto; text-align: left; }
 .modal-card.wide .modal-icon { margin: 0 auto var(--space-md); }
 .modal-card.wide h3 { justify-content: flex-start; text-align: left; }
 .modal-card.wide > p { text-align: left; }
 .modal-card.wide .form-grid { margin: var(--space-md) 0; }
-
-.modal-card h3 { justify-content: center; text-align: center; }
 
 .scan-wrap { position: relative; max-width: 420px; margin: 0 auto; background: #000; }
 .scan-wrap video { width: 100%; display: block; }
