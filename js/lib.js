@@ -141,9 +141,9 @@ export function toast(message, type = "info") {
     setTimeout(() => { t.style.opacity = "0"; t.style.transform = "translateX(120%)"; setTimeout(() => t.remove(), 300); }, 4200);
 }
 
-export function modal(html, { sticky = false } = {}) {
+export function modal(html, { sticky = false, wide = true } = {}) {
     const ov = document.createElement("div"); ov.className = "modal-overlay";
-    ov.innerHTML = `<div class="modal-card wide">${html}</div>`;
+    ov.innerHTML = `<div class="modal-card ${wide ? 'wide' : ''}">${html}</div>`;
     document.body.appendChild(ov); requestAnimationFrame(() => ov.classList.add("active"));
     const close = () => { ov.classList.remove("active"); setTimeout(() => ov.remove(), 250); };
     if (!sticky) ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
@@ -154,7 +154,7 @@ export function modal(html, { sticky = false } = {}) {
 export function confirmBox(title, msg, ok = "Ya", danger = false) {
     return new Promise(res => {
         const m = modal(`<div class="modal-icon"><span class="material-icons-round">${danger ? "warning" : "help"}</span></div><h3>${esc(title)}</h3><p>${esc(msg)}</p>
-        <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn ${danger ? "btn-delete" : "btn-save"}" id="cbOk" style="flex:0 0 auto;padding:12px 22px">${esc(ok)}</button></div>`, { sticky: true });
+        <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn ${danger ? "btn-delete" : "btn-save"}" id="cbOk" style="flex:0 0 auto;padding:12px 22px">${esc(ok)}</button></div>`, { sticky: true, wide: false });
         $$("[data-close]", m.el).forEach(b => b.addEventListener("click", () => res(false)));
         $("#cbOk", m.el).addEventListener("click", () => { m.close(); res(true); });
     });

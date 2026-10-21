@@ -60,8 +60,8 @@ async function startApp(user) {
         <span class="material-icons-round">account_circle</span>
         <span class="admin-email">${esc(user.email)}</span>
       </div>
-      <div class="row-btns" style="margin:0">
-        <button class="btn btn-save" id="addBtn" style="flex:0 0 auto;padding:10px 14px">${icon("add")} Walk-in / Manual</button>
+      <div class="admin-actions">
+        <button class="btn btn-save" id="addBtn" style="padding:10px 14px">${icon("add")} Walk-in / Manual</button>
         <button class="btn btn-ghost" id="outBtn" style="padding:10px 14px">${icon("logout", 18)}</button>
       </div>
     </div>
@@ -106,11 +106,11 @@ function setTab(t) {
             <div class="modal-icon" style="background:var(--warning-soft); color:var(--warning); border-color:var(--warning-border)"><span class="material-icons-round">warning</span></div>
             <h3>Perubahan Belum Disimpan</h3>
             <p>Kamu memiliki perubahan pengaturan yang belum disimpan. Apa yang ingin kamu lakukan?</p>
-            <div class="modal-actions" style="flex-direction:column-reverse; gap:8px">
-                <button class="btn btn-ghost" id="btnDiscard">Tinggalkan tanpa simpan</button>
+            <div class="modal-actions" style="flex-direction:column; gap:8px">
                 <button class="btn btn-save" id="btnSave">Simpan Pengaturan</button>
+                <button class="btn btn-ghost" id="btnDiscard">Tinggalkan tanpa simpan</button>
             </div>
-        `, { sticky: true });
+        `, { sticky: true, wide: false });
         $("#btnDiscard", m.el).onclick = () => {
             S.dirty = false;
             m.close();
@@ -129,7 +129,7 @@ function setTab(t) {
     
     let extra = "";
     if (t === "list") {
-        const hasFilter = S.f.status !== "AKTIF" || S.f.day !== "ALL" || S.f.sort !== "main" || (S.st.lokasi.length > 1 && S.f.lokasi !== "ALL");
+        const hasFilter = S.f.status !== "AKTIF" || S.f.day !== "ALL" || S.f.sort !== "main" || S.f.lokasi !== "ALL";
         extra = `<input id="fQ" placeholder="Cari nama / WA / kode" value="${esc(S.f.q)}">
           <button class="btn btn-ghost ${hasFilter ? 'filter-active' : ''}" id="btnFilter" title="Filter & Urutkan">${icon("tune", 18)}</button>`;
     }
@@ -145,13 +145,12 @@ function setTab(t) {
 
 function filterModal() {
     const f = S.f;
-    const multiLok = S.st.lokasi.length > 1;
     const m = modal(`<h3>${icon("tune")} Filter & Urutkan</h3>
         <div class="form-grid" style="grid-template-columns: 1fr; gap:16px; margin-top:20px;">
-            ${multiLok ? `<div class="form-group"><label>Cabang</label><select id="mfLokasi">
+            <div class="form-group"><label>Cabang</label><select id="mfLokasi">
                 <option value="ALL" ${f.lokasi === "ALL" ? "selected" : ""}>Semua Cabang</option>
                 ${S.st.lokasi.map(l => `<option value="${esc(l)}" ${f.lokasi === l ? "selected" : ""}>${esc(l)}</option>`).join("")}
-            </select></div>` : ""}
+            </select></div>
             <div class="form-group"><label>Status</label><select id="mfStatus">${[["AKTIF", "Aktif"], ["SEMUA", "Semua status"], ...Object.entries(STATUS).map(([k, v]) => [k, v[0]])].map(([k, l]) => `<option value="${k}" ${f.status === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
             <div class="form-group"><label>Tanggal</label><select id="mfDay">${[["ALL", "Semua tanggal"], ["TODAY", "Hari ini"], ["TOM", "Besok"], ["WEEK", "7 hari ke depan"]].map(([k, l]) => `<option value="${k}" ${f.day === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
             <div class="form-group"><label>Urutkan</label><select id="mfSort"><option value="main" ${f.sort === "main" ? "selected" : ""}>Waktu main</option><option value="masuk" ${f.sort === "masuk" ? "selected" : ""}>Terbaru masuk</option></select></div>
@@ -159,15 +158,15 @@ function filterModal() {
         <div class="modal-actions" style="margin-top:24px">
             <button class="btn btn-ghost" id="mfReset">Reset</button>
             <button class="btn btn-save" id="mfApply">Terapkan</button>
-        </div>`);
+        </div>`, { wide: false });
     $("#mfReset", m.el).onclick = () => {
-        if (multiLok) $("#mfLokasi", m.el).value = "ALL";
+        $("#mfLokasi", m.el).value = "ALL";
         $("#mfStatus", m.el).value = "AKTIF";
         $("#mfDay", m.el).value = "ALL";
         $("#mfSort", m.el).value = "main";
     };
     $("#mfApply", m.el).onclick = () => {
-        if (multiLok) S.f.lokasi = $("#mfLokasi", m.el).value;
+        S.f.lokasi = $("#mfLokasi", m.el).value;
         S.f.status = $("#mfStatus", m.el).value;
         S.f.day = $("#mfDay", m.el).value;
         S.f.sort = $("#mfSort", m.el).value;
@@ -265,7 +264,7 @@ async function run(fn, ok) {
 
 function conflictModal(cs) {
     const rows = cs.map(r => { const o = S.byBid.get(r.bid); return `<li>${esc(fmtDT(r.s))}–${esc(witaTime(r.e))} · ${esc(r.k)}${o ? " · " + esc(o.nama) : ""}</li>`; }).join("");
-    modal(`<div class="modal-icon"><span class="material-icons-round">warning</span></div><h3>Slot sudah terisi</h3><p>Tidak bisa diproses karena bentrok dengan:</p><ul style="margin:8px 0 16px 18px; line-height:1.6;">${rows}</ul><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`);
+    modal(`<div class="modal-icon"><span class="material-icons-round">warning</span></div><h3>Slot sudah terisi</h3><p>Tidak bisa diproses karena bentrok dengan:</p><ul style="margin:8px 0 16px 18px; text-align:left; line-height:1.6;">${rows}</ul><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`, { wide: false });
 }
 
 const changeStatus = (b, patch, { release = false, add = null } = {}) => {
@@ -285,7 +284,7 @@ function sendWA(b, key, x = {}) {
 
 function waPrompt(b, key, title, x) {
     const m = modal(`<div class="modal-icon"><span class="material-icons-round">chat</span></div><h3>${esc(title)}</h3><p>Kirim kabar ke ${esc(b.nama)} lewat WhatsApp supaya halaman booking-nya dibuka.</p>
-      <div class="modal-actions"><button class="btn btn-ghost" data-close>Nanti</button><button class="btn btn-wa" id="waGo">${icon("send", 16)} Kirim WA</button></div>`);
+      <div class="modal-actions"><button class="btn btn-ghost" data-close>Nanti</button><button class="btn btn-wa" id="waGo">${icon("send", 16)} Kirim WA</button></div>`, { wide: false });
     $("#waGo", m.el).onclick = () => { sendWA({ ...b, ...(x || {}) }, key, x); m.close(); };
 }
 
@@ -455,7 +454,7 @@ function editModal(b) {
 }
 
 function manualModal(pre = {}) {
-    const tipe = pre.tipe || "WALKIN", lok = pre.lokasi || (S.loc !== "ALL" ? S.loc : S.st.lokasi[0]);
+    const tipe = pre.tipe || "WALKIN", lok = pre.lokasi || (S.f.lokasi !== "ALL" ? S.f.lokasi : S.st.lokasi[0]);
     const m = modal(`<h3>${icon("add_circle")} Tambah manual</h3><div class="form-grid">
       <div class="form-group full-width"><label>Jenis</label><select id="mTipe"><option value="WALKIN" ${tipe === "WALKIN" ? "selected" : ""}>Walk-in (mulai sekarang)</option><option value="MANUAL" ${tipe === "MANUAL" ? "selected" : ""}>Booking manual (telepon / WA)</option><option value="BLOK" ${tipe === "BLOK" ? "selected" : ""}>Blokir room (maintenance / acara)</option></select></div>
       <div class="form-group"><label>Lokasi</label><select id="mLok">${S.st.lokasi.map(l => `<option ${l === lok ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div><div class="form-group"><label>Room</label><select id="mRoom"></select></div>

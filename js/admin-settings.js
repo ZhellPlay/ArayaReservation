@@ -282,7 +282,7 @@ export function renderSettings(el, S, H) {
                 <button class="btn btn-ghost" data-close>Batal</button>
                 <button class="btn btn-save" id="confirmSave">Simpan</button>
             </div>
-        `);
+        `, { wide: false });
         
         $("#confirmSave", m.el).onclick = async () => {
             m.close();
