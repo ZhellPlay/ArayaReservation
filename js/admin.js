@@ -32,6 +32,22 @@ window.addEventListener("beforeunload", (e) => {
     if (S.dirty) { e.preventDefault(); e.returnValue = ""; }
 });
 
+function beep() {
+    try {
+        const c = new (window.AudioContext || window.webkitAudioContext)();
+        const o1 = c.createOscillator(), o2 = c.createOscillator(), g = c.createGain();
+        o1.type = "triangle";
+        o2.type = "sawtooth";
+        o1.connect(g); o2.connect(g); g.connect(c.destination);
+        o1.frequency.value = 880;
+        o2.frequency.value = 1760;
+        g.gain.setValueAtTime(0.6, c.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.8);
+        o1.start(); o2.start();
+        setTimeout(() => { o1.stop(); o2.stop(); c.close(); }, 800);
+    } catch (e) { }
+}
+
 function showLogin(msg = "") {
     root.innerHTML = `<div class="panel login-box"><h3 style="justify-content:center">${icon("lock")} Khusus Admin</h3><p class="muted">${esc(msg) || "Masuk dengan akun Google admin."}</p>
     <button class="btn btn-save btn-block" id="loginBtn">${icon("login")} Masuk dengan Google</button></div>`;
@@ -86,8 +102,6 @@ function subscribe() {
         setTimeout(sweep, 1500);
     }, e => toast("Gagal memuat data: " + (e.code || e.message), "error"));
 }
-
-function beep() { try { const c = new (window.AudioContext || window.webkitAudioContext)(), o = c.createOscillator(), g = c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value = 880; g.gain.value = .15; o.start(); setTimeout(() => { o.stop(); c.close(); }, 250); } catch (e) { } }
 
 const TABS = [["inbox", "inbox", "Perlu Tindakan"], ["list", "list_alt", "Semua Booking"], ["scan", "qr_code_scanner", "Check-in"], ["settings", "settings", "Pengaturan"]];
 const inboxItems = () => S.bookings.filter(b => locOk(b) && ["PENDING", "MENUNGGU_VERIFIKASI"].includes(eff(b)));
@@ -327,31 +341,29 @@ function approveModal(b) {
     const rivals = clashes.filter(o => eff(o) === "PENDING");
     const cashDefault = !!b.cashDp, hold = S.st.holdMinutes || 30;
     const defDeadline = cashDefault ? Math.max(b.startMs, now() + 30 * 60000) : now() + hold * 60000;
+    
     const m = modal(`<h3>${icon("check_circle")} Setujui booking</h3>
       <p><b>${esc(b.nama)}</b> · ${esc(b.lokasi)} ${esc(b.room)}<br>${esc(fmtDate(b.tanggal))}, ${esc(rangeTxt(b))}</p>
       ${hard.length ? `<div class="banner warn">${icon("warning")}<span>Bentrok dengan: ${hard.map(o => esc(o.nama) + " " + rangeTxt(o)).join(", ")}. Sistem akan menolak.</span></div>` : ""}
       ${rivals.length ? `<div class="banner warn">${icon("groups")}<span>Ada ${rivals.length} permintaan lain di jam ini: ${rivals.map(o => esc(o.nama) + " " + rangeTxt(o)).join(", ")}. Menyetujui satu akan menahan slot.</span></div>` : ""}
       ${b.cashDp ? `<div class="banner ok">${icon("info")}<span>Pelanggan minta DP tunai.</span></div>` : ""}
       <div class="form-grid">
-        <div class="form-group"><label>Total</label><input id="aTotal" inputmode="numeric" value="${p.total || ""}" placeholder="0"></div>
-        <div class="form-group"><label>DP (${S.st.dpPercent}%)</label><input id="aDp" inputmode="numeric" value="${p.dp || ""}" placeholder="0"></div>
+        <div class="form-group"><label>Total (Otomatis)</label><input value="${rupiah(p.total)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
+        <div class="form-group"><label>DP (${S.st.dpPercent}%)</label><input value="${rupiah(p.dp)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
         <div class="form-group"><label>Metode DP</label><select id="aMethod"><option value="QRIS" ${cashDefault ? "" : "selected"}>QRIS</option><option value="CASH" ${cashDefault ? "selected" : ""}>Tunai di tempat</option></select></div>
         <div class="form-group"><label>Batas bayar (WITA)</label><input type="datetime-local" id="aDead" value="${witaDateTimeInput(defDeadline)}"></div>
       </div>
       <label class="check" style="margin-top:8px"><input type="checkbox" id="aChk"><span>Saya sudah memastikan room <b>kosong</b> di jam ini (termasuk walk-in yang sedang main).</span></label>
       <div class="modal-actions" style="margin-top:20px"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-ok" id="aGo">${icon("check", 16)} Setujui</button></div>`);
-    let dpTouched = false;
-    $("#aDp", m.el).addEventListener("input", () => dpTouched = true);
-    $("#aTotal", m.el).addEventListener("input", e => { if (!dpTouched) $("#aDp", m.el).value = Math.round(parseNum(e.target.value) * S.st.dpPercent / 100) || ""; });
+    
     $("#aGo", m.el).onclick = async e => {
-        const total = parseNum($("#aTotal", m.el).value), dp = parseNum($("#aDp", m.el).value), method = $("#aMethod", m.el).value, deadline = fromDateTimeInput($("#aDead", m.el).value);
+        const method = $("#aMethod", m.el).value, deadline = fromDateTimeInput($("#aDead", m.el).value);
         if (!$("#aChk", m.el).checked) return toast("Centang dulu: pastikan room kosong", "error");
-        if (method === "QRIS" && dp <= 0) return toast("DP untuk QRIS harus diisi", "error");
+        if (method === "QRIS" && p.dp <= 0) return toast("DP untuk QRIS harus diisi", "error");
         if (!deadline || deadline <= now()) return toast("Batas bayar harus di masa depan", "error");
-        if (total && dp > total) return toast("DP tidak boleh lebih besar dari total", "error");
-        const payAmount = dp;
+        const payAmount = p.dp;
         setBusy(e.currentTarget, true, "Memproses…");
-        const add = addOf(b, "MENUNGGU_BAYAR", deadline), patch = { status: "MENUNGGU_BAYAR", total, dpDue: dp, dpMethod: method, payAmount, payDeadline: deadline, approvedAt: now(), payNote: "" };
+        const add = addOf(b, "MENUNGGU_BAYAR", deadline), patch = { status: "MENUNGGU_BAYAR", total: p.total, dpDue: p.dp, dpMethod: method, payAmount, payDeadline: deadline, approvedAt: now(), payNote: "" };
         const ok = await run(() => changeStatus(b, patch, { add }), "Disetujui, slot ditahan");
         if (ok) { m.close(); waPrompt({ ...b, ...patch }, method === "CASH" ? "approveCash" : "approve", "Kabari pelanggan"); } else setBusy(e.currentTarget, false);
     };
@@ -434,17 +446,58 @@ function editModal(b) {
       <div class="form-group"><label>Mulai (WITA)</label><input type="datetime-local" id="eDt" value="${witaDateTimeInput(b.startMs)}"></div>
       <div class="form-group"><label>Durasi (jam)</label><input type="number" step="0.5" min="0.5" id="eDur" value="${b.durasi}"></div>
       <div class="form-group"><label>Orang</label><input type="number" id="eOrg" value="${b.orang}"></div><div class="form-group"><label>Mic</label><input type="number" id="eMic" value="${b.mic || 0}"></div>
-      <div class="form-group"><label>Total</label><input id="eTot" inputmode="numeric" value="${b.total || ""}"></div><div class="form-group"><label>DP</label><input id="eDp" inputmode="numeric" value="${b.dpDue || ""}"></div>
+      <div class="form-group"><label>Total (Otomatis)</label><input id="eTot" readonly style="opacity:0.7; cursor:not-allowed;"></div><div class="form-group"><label>DP (Otomatis)</label><input id="eDp" readonly style="opacity:0.7; cursor:not-allowed;"></div>
       <div class="form-group full-width"><label>Catatan</label><textarea id="eCat" rows="2">${esc(b.catatan || "")}</textarea></div></div>
       ${isOpen(b.status) && b.slot ? `<p class="muted">Slot akan dipindahkan otomatis, dan dicek bentrok ulang.</p>` : ""}
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-save" id="eGo" style="flex:0 0 auto;padding:12px 22px">Simpan</button></div>`);
-    const fill = () => { $("#eRoom", m.el).innerHTML = roomsOf($("#eLok", m.el).value).map(n => `<option ${n === b.room ? "selected" : ""}>${esc(n)}</option>`).join(""); };
-    fill(); $("#eLok", m.el).onchange = fill;
+    
+    let m_tot = 0, m_dp = 0;
+    const recalc = () => {
+        const lok = $("#eLok", m.el).value, roomName = $("#eRoom", m.el).value;
+        const dur = parseFloat($("#eDur", m.el).value) || 0;
+        const org = parseInt($("#eOrg", m.el).value) || 1;
+        const mic = parseInt($("#eMic", m.el).value) || 0;
+        const r = roomCfg(S.st, lok, roomName);
+        if (r && dur > 0) {
+            const p = calcPrice(S.st, r, dur, org, mic);
+            $("#eTot", m.el).value = rupiah(p.total);
+            $("#eDp", m.el).value = rupiah(p.dp);
+            m_tot = p.total; m_dp = p.dp;
+        } else {
+            $("#eTot", m.el).value = "-";
+            $("#eDp", m.el).value = "-";
+            m_tot = 0; m_dp = 0;
+        }
+    };
+
+    const fill = () => { 
+        $("#eRoom", m.el).innerHTML = roomsOf($("#eLok", m.el).value).map(n => `<option ${n === b.room ? "selected" : ""}>${esc(n)}</option>`).join(""); 
+        recalc();
+    };
+    fill(); 
+    $("#eLok", m.el).onchange = fill;
+    ["eRoom", "eDur", "eOrg", "eMic"].forEach(id => $("#" + id, m.el).addEventListener("input", recalc));
+    
     $("#eGo", m.el).onclick = async () => {
         const s = fromDateTimeInput($("#eDt", m.el).value), dur = parseFloat($("#eDur", m.el).value);
         if (!s || !(dur > 0)) return toast("Waktu / durasi tidak valid", "error");
-        const e = s + Math.round(dur * H), patch = { nama: $("#eNama", m.el).value.trim() || b.nama, wa: normWA($("#eWa", m.el).value), lokasi: $("#eLok", m.el).value, room: $("#eRoom", m.el).value, tanggal: witaDate(s), jamMulai: witaTime(s), durasi: dur, startMs: s, endMs: e, orang: parseInt($("#eOrg", m.el).value) || 1, mic: parseInt($("#eMic", m.el).value) || 0, catatan: $("#eCat", m.el).value.trim(), upd: serverTimestamp() };
-        const tot = parseNum($("#eTot", m.el).value), dp = parseNum($("#eDp", m.el).value); if (tot) patch.total = tot; if (dp) patch.dpDue = dp;
+        const e = s + Math.round(dur * H), patch = { 
+            nama: $("#eNama", m.el).value.trim() || b.nama, 
+            wa: normWA($("#eWa", m.el).value), 
+            lokasi: $("#eLok", m.el).value, 
+            room: $("#eRoom", m.el).value, 
+            tanggal: witaDate(s), 
+            jamMulai: witaTime(s), 
+            durasi: dur, 
+            startMs: s, 
+            endMs: e, 
+            orang: parseInt($("#eOrg", m.el).value) || 1, 
+            mic: parseInt($("#eMic", m.el).value) || 0, 
+            catatan: $("#eCat", m.el).value.trim(), 
+            total: m_tot,
+            dpDue: m_dp,
+            upd: serverTimestamp() 
+        };
         const nb = { ...b, ...patch };
         const ok = await run(async () => {
             if (b.slot && isOpen(b.status)) await applyTx({ remove: [rangeOf(b)], add: addOf(nb), bufMs: bufMs(), alive, bookingRef: refOf(b), bookingData: patch });

@@ -8,13 +8,26 @@ import { rangesForDay, conflictsIn, checkFree } from "./avail.js";
 import { makeDynamic } from "./qris.js";
 
 const H = 3600000, view = $("#view");
-let ST = mergeSettings(null), QRC = {}, unsub = null, ticker = null;
+let ST = mergeSettings(null), QRC = {}, unsub = null, ticker = null, lastStatus = null;
 
 const mine = () => { try { return JSON.parse(localStorage.getItem("araya_mine") || "[]"); } catch (e) { return []; } };
 const setMine = a => { try { localStorage.setItem("araya_mine", JSON.stringify(a.slice(0, 30))); } catch (e) { } };
 const remember = it => setMine([it, ...mine().filter(x => x.s !== it.s)]);
 const forget = s => setMine(mine().filter(x => x.s !== s));
 const recentSubmits = () => { try { return JSON.parse(localStorage.getItem("araya_sub") || "[]").filter(t => Date.now() - t < H); } catch (e) { return []; } };
+
+function beepUser() {
+    try {
+        const c = new (window.AudioContext || window.webkitAudioContext)();
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = "triangle";
+        o.connect(g); g.connect(c.destination);
+        o.frequency.value = 1046.50;
+        g.gain.setValueAtTime(0.6, c.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.6);
+        o.start(); setTimeout(() => { o.stop(); c.close(); }, 600);
+    } catch (e) { }
+}
 
 function route() {
     if (unsub) { unsub(); unsub = null; } clearInterval(ticker);
@@ -90,7 +103,11 @@ let slotToken = 0;
 
 function viewForm() {
     const today = witaDate(now());
-    view.innerHTML = `<div class="form-card"><div class="form-title">${icon("edit_note")}<span>Ajukan Booking</span></div>
+    const retryStr = sessionStorage.getItem("araya_retry");
+    const retry = retryStr ? JSON.parse(retryStr) : null;
+    sessionStorage.removeItem("araya_retry");
+
+    view.innerHTML = `<div class="form-card"><div class="form-title">${icon("edit_note")}<span>${retry ? "Sesuaikan Booking" : "Ajukan Booking"}</span></div>
     <div class="form-grid" style="margin-top:20px">
       <div class="form-group full-width"><label>Nama</label><input id="f-nama" maxlength="60" placeholder="Nama pemesan" autocomplete="name"></div>
       <div class="form-group full-width"><label>WhatsApp</label><input id="f-wa" inputmode="tel" placeholder="08xxxxxxxxxx" autocomplete="tel">
@@ -167,7 +184,23 @@ function viewForm() {
         inp.onchange = () => { inp.value = Math.min(mx, Math.max(mn, parseInt(inp.value) || mn)); if (inp.id === "f-durasi") { jam = null; all(); } else info(); };
     });
     $("#f-slots").addEventListener("click", e => { const c = e.target.closest(".chip"); if (!c || c.disabled) return; jam = c.dataset.t; $$(".chip", $("#f-slots")).forEach(x => x.classList.toggle("on", x === c)); });
+    
     info();
+
+    if (retry) {
+        $("#f-nama").value = retry.nama;
+        $("#f-wa").value = retry.wa;
+        $("#f-lokasi").value = retry.lokasi;
+        fillRooms();
+        $("#f-room").value = retry.room;
+        $("#f-tanggal").value = retry.tanggal;
+        $("#f-durasi").value = retry.durasi;
+        $("#f-orang").value = retry.orang;
+        $("#f-mic").value = retry.mic;
+        $("#f-cash").checked = retry.cash;
+        $("#f-catatan").value = retry.catatan;
+        all();
+    }
 
     $("#f-submit").onclick = async e => {
         const btn = e.currentTarget, v = rd(), r = roomCfg(ST, v.lokasi, v.room);
@@ -206,11 +239,20 @@ function viewDetail(secret) {
     view.innerHTML = `<div class="panel center muted">Memuat booking…</div>`;
     let last = null, fresh = sessionStorage.getItem("araya_new") === secret;
     const draw = () => { if (last) renderDetail(secret, last, fresh); };
+    
     unsub = onSnapshot(doc(db, "bookings", secret), s => {
         if (!s.exists()) { view.innerHTML = `<div class="panel center"><span class="material-icons-round big">link_off</span><h3>Booking tidak ditemukan</h3><p class="muted">Link salah, atau booking sudah dihapus admin.</p><p><a class="btn btn-ghost" href="#/find">Cari pakai kode</a> <a class="btn btn-ghost" href="#/">Beranda</a></p></div>`; forget(secret); return; }
-        last = s.data(); remember({ s: secret, kode: last.kode, nama: last.nama, lokasi: last.lokasi, room: last.room, tanggal: last.tanggal, jam: last.jamMulai, at: Date.now() });
+        const d = s.data();
+        
+        if (lastStatus && lastStatus !== d.status && ["MENUNGGU_BAYAR", "TERKONFIRMASI", "DITOLAK", "MENUNGGU_VERIFIKASI"].includes(d.status)) {
+            beepUser();
+        }
+        lastStatus = d.status;
+        
+        last = d; remember({ s: secret, kode: last.kode, nama: last.nama, lokasi: last.lokasi, room: last.room, tanggal: last.tanggal, jam: last.jamMulai, at: Date.now() });
         draw();
     }, err => { view.innerHTML = `<div class="panel center"><h3>Gagal memuat</h3><p class="muted">Cek koneksi internet kamu lalu muat ulang.</p></div>`; });
+    
     ticker = setInterval(() => {
         if (!last) return; let expire = false;
         $$("[data-cd]").forEach(el => { const left = +el.dataset.cd - now(); el.textContent = fmtCountdown(left); if (left <= 0) expire = true; });
@@ -224,7 +266,7 @@ function renderDetail(secret, b, fresh) {
     const stage = { PENDING: 0, MENUNGGU_BAYAR: 1, MENUNGGU_VERIFIKASI: 2, TERKONFIRMASI: 3, CHECKED_IN: 3, SELESAI: 3 }[eff];
     const names = ["Diajukan", "Disetujui", "Dibayar", "Siap main"];
     const stepsHtml = stage === undefined ? "" : `<div class="steps">${names.map((n, i) => `<div class="step ${i < stage ? "done" : i === stage ? "now" : ""}"><i></i><span>${n}</span></div>`).join("")}</div>`;
-    const adminWA = ST.adminWA ? waLink(ST.adminWA, `Halo admin, saya ${b.nama}. Kode booking ${b.kode}.`) : "";
+    const adminWA = ST.adminWA ? waLink(ST.adminWA, `Halo admin, saya *${b.nama}*. Mohon konfirmasi booking saya dengan kode *${b.kode}* untuk tanggal ${fmtDate(b.tanggal, false)} jam ${b.jamMulai}. Terima kasih.`) : "";
     let body = "";
 
     if (fresh) body += `<div class="banner ok">${icon("check_circle")}<div><b>Permintaan terkirim!</b><br>Simpan link halaman ini. Kamu juga bisa kembali kapan saja pakai <b>kode ${esc(b.kode)}</b> + nomor WA.</div></div>`;
@@ -262,13 +304,17 @@ function renderDetail(secret, b, fresh) {
         body += `</div>`;
     }
     if (eff === "SELESAI") body += `<div class="panel"><h3>${icon("celebration")} Terima kasih sudah main!</h3><p class="muted">Sampai ketemu lagi di ARAYA GAMESTATION.</p><a class="btn btn-save" href="#/new">Booking lagi</a></div>`;
-    if (eff === "DITOLAK") body += `<div class="panel bad"><h3>${icon("cancel")} Belum bisa diproses</h3><p>${esc(b.rejectReason || "Jadwal tidak tersedia.")}</p><a class="btn btn-save" href="#/new">Pilih jadwal lain</a></div>`;
+    if (eff === "DITOLAK") {
+        body += `<div class="panel bad"><h3>${icon("cancel")} Belum bisa diproses</h3><p>${esc(b.rejectReason || "Jadwal tidak tersedia.")}</p>
+        <button class="btn btn-save" id="retryBtn">Sesuaikan & Ajukan Ulang</button></div>`;
+    }
     if (eff === "DIBATALKAN") body += `<div class="panel"><h3>${icon("block")} Booking dibatalkan</h3></div>`;
     if (eff === "NO_SHOW") body += `<div class="panel bad"><h3>${icon("person_off")} Tidak datang</h3><p class="muted">${esc(ST.policy)}</p></div>`;
     if (b.payNote && eff === "MENUNGGU_BAYAR") body += `<div class="banner warn">${icon("report")}<span>Catatan admin: ${esc(b.payNote)}</span></div>`;
 
     const money = b.total ? `<div class="kv"><span>Total</span><b>${rupiah(b.total)}</b></div><div class="kv"><span>DP${b.dpMethod === "CASH" ? " (tunai)" : ""}</span><b>${rupiah(b.dpDue)}</b></div>${b.dpPaid ? `<div class="kv"><span>DP diterima</span><b class="okc">${rupiah(b.dpPaid)}</b></div>` : ""}` : b.estTotal ? `<div class="kv"><span>Estimasi total</span><b>${rupiah(b.estTotal)}</b></div>` : "";
     const canCancel = ["PENDING", "MENUNGGU_BAYAR"].includes(eff);
+    
     view.innerHTML = `<div class="detail-head"><a href="#/" class="muted">‹ Beranda</a>${pill(eff)}</div>
     ${stepsHtml}${body}
     <div class="panel"><h3>${icon("receipt_long")} Detail</h3>
@@ -281,12 +327,22 @@ function renderDetail(secret, b, fresh) {
     <div class="panel"><h3>${icon("bookmark")} Akses Booking &amp; Bantuan</h3><p class="muted">Link ini rahasia. Simpan link agar kamu bisa mengecek status booking kapan saja. Jika link hilang atau butuh bantuan, silakan hubungi admin.</p>
       <div class="row-btns" style="justify-content: center; gap: 12px;">
         <button class="btn btn-ghost" id="copyLink">${icon("link", 16)} Salin Link</button>
-        ${adminWA ? `<a class="btn btn-wa" target="_blank" rel="noopener" href="${adminWA}">${icon("support_agent", 16)} Hubungi WA Admin</a>` : ""}
+        ${adminWA ? `<a class="btn btn-wa" target="_blank" rel="noopener" href="${adminWA}">${icon("support_agent", 16)} Minta Konfirmasi via WA</a>` : ""}
       </div>
     </div>
     ${canCancel ? `<button class="btn btn-delete btn-block" id="cancelBtn">${icon("close", 16)} Batalkan booking</button>` : ""}
     <p class="muted center" style="margin-top:14px">${esc(ST.policy)}</p>`;
+    
     if (fresh) sessionStorage.removeItem("araya_new");
+
+    $("#retryBtn")?.addEventListener("click", () => {
+        sessionStorage.setItem("araya_retry", JSON.stringify({
+            nama: b.nama, wa: b.wa, lokasi: b.lokasi, room: b.room, tanggal: b.tanggal,
+            durasi: b.durasi, orang: b.orang, mic: b.mic || 0,
+            catatan: b.catatan || "", cash: b.cashDp || false
+        }));
+        location.hash = "#/new";
+    });
 
     $("#copyLink")?.addEventListener("click", () => copyText(link));
     $("#copyNom")?.addEventListener("click", () => copyText(String(b.payAmount)));
