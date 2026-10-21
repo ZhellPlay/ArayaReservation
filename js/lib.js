@@ -99,8 +99,8 @@ const DEF_LOK = "CABANG 1";
 export const DEFAULT_SETTINGS = {
     lokasi: [DEF_LOK],
     rooms: { [DEF_LOK]: mkRooms() },
-    micPrice: 0, addonPerHour: true, micPerHour: false,
-    dpPercent: 50, holdMinutes: 30, bufferMin: 0, noShowGraceMin: 15, pendingTtlHours: 24, minLeadMin: 15, maxDurasi: 12,
+    micPrice: 0, addonPerHour: false, micPerHour: false,
+    dpPercent: 50, holdMinutes: 30, bufferMin: 0, noShowGraceMin: 15, pendingTtlHours: 24, minLeadMin: 30, maxDurasi: 12,
     adminWA: "", holidays: [], policy: "DP hangus jika batal setelah pembayaran atau tidak datang.",
     templates: {
         approve: "Halo {nama} 👋\nBooking kamu di ARAYA GAMESTATION {lokasi} ({room}) pada {tanggal}, jam {jam} sudah DISETUJUI ✅\n\nSilakan bayar DP {nominal} sebelum {deadline}, lalu upload bukti di link ini:\n{link}\n\nKode booking: {kode}",

@@ -12,7 +12,7 @@ import { renderSettings } from "./admin-settings.js";
 
 const H = 3600000, root = $("#root");
 export const S = { st: mergeSettings(null), qris: {}, bookings: [], byBid: new Map(), tab: "inbox", f: { lokasi: "ALL", status: "AKTIF", day: "ALL", sort: "main", q: "" }, hist: 3, dirty: false, pendingTab: null };
-let unsubB = null, firstSnap = true, scanStream = null, sweepTimer = null;
+let unsubB = null, firstSnap = true, scanStream = null, scanStarting = false, sweepTimer = null;
 
 const bufMs = () => (S.st.bufferMin || 0) * 60000;
 const eff = b => effStatus(b, S.st);
@@ -567,11 +567,15 @@ async function sweep() {
 }
 
 function renderScan() {
-    $("#body").innerHTML = `<div class="panel"><h3>${icon("qr_code_scanner")} Scan QR pelanggan</h3><div class="scan-wrap" id="scanWrap" hidden><video id="scanVid" playsinline muted></video></div>
-      <div class="row-btns"><button class="btn btn-save" id="scanStart" style="flex:0 0 auto">${icon("photo_camera", 16)} Buka kamera</button></div>
-      <div class="form-group" style="margin-top:16px"><label>Atau cari manual (nama / WA / kode)</label><input id="scanQ" placeholder="mis. ARY-7K3QXD, 0812…, nama"></div></div>
+    $("#body").innerHTML = `<div class="panel"><h3>${icon("qr_code_scanner")} Scan QR pelanggan</h3>
+      <div class="scan-row">
+        <button class="btn btn-save" id="scanToggle" type="button"></button>
+        <div class="form-group"><label for="scanQ">Atau cari manual</label><input id="scanQ" placeholder="Nama / WA / kode booking"></div>
+      </div>
+      <div class="scan-wrap" id="scanWrap" hidden><video id="scanVid" playsinline muted></video></div></div>
       <div id="scanRes"></div><div class="section-header"><div class="section-title">${icon("today", 22)} Terkonfirmasi hari ini</div></div><div id="scanList"></div>`;
-    $("#scanStart").onclick = startScan;
+    setScanUi(false);
+    $("#scanToggle").onclick = () => scanStream || scanStarting ? stopScan() : startScan();
     $("#scanQ").addEventListener("input", e => renderScanList(e.target.value));
     renderScanList();
 }
@@ -583,10 +587,20 @@ function renderScanList(q = ($("#scanQ")?.value || "")) {
     el.innerHTML = gridOf(arr, q ? "Tidak ditemukan di data yang dimuat." : "Belum ada.");
 }
 
+function setScanUi(on) {
+    const b = $("#scanToggle"); if (!b) return;
+    b.innerHTML = on ? `${icon("videocam_off", 16)} Tutup kamera` : `${icon("photo_camera", 16)} Buka kamera`;
+    b.classList.toggle("btn-delete", on);
+    b.classList.toggle("btn-save", !on);
+}
+
 async function startScan() {
+    scanStarting = true;
     try {
-        scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        const v = $("#scanVid"); v.srcObject = scanStream; await v.play(); $("#scanWrap").hidden = false;
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        if (!scanStarting) { stream.getTracks().forEach(t => t.stop()); return; }
+        scanStream = stream;
+        const v = $("#scanVid"); v.srcObject = scanStream; await v.play(); $("#scanWrap").hidden = false; setScanUi(true);
         const c = document.createElement("canvas"), cx = c.getContext("2d", { willReadFrequently: true });
         const tick = () => {
             if (!scanStream) return;
@@ -600,9 +614,15 @@ async function startScan() {
         };
         tick();
     } catch (e) { toast("Kamera tidak bisa dibuka. Izinkan akses kamera atau pakai pencarian manual.", "error"); }
+    finally { scanStarting = false; }
 }
 
-function stopScan() { if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; } const w = $("#scanWrap"); if (w) w.hidden = true; }
+function stopScan() {
+    scanStarting = false;
+    if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+    const w = $("#scanWrap"); if (w) w.hidden = true;
+    setScanUi(false);
+}
 
 async function showScanResult(kode) {
     let b = S.bookings.find(x => x.kode === kode);

@@ -17,7 +17,7 @@ const lokBlock = (l, rms) => `<div class="lok-block" data-loksec="${esc(l)}">
     <input class="lok-name" data-lokname value="${esc(l)}" maxlength="30" placeholder="Nama cabang" aria-label="Nama cabang">
     <h4 class="subsec-title">Room &amp; Tarif</h4>
     <div class="scroll-x"><table class="tbl" data-lok="${esc(l)}">
-        <thead><tr><th>Room</th><th>Tarif/jam</th><th>Min jam</th><th>Kapasitas</th><th>Maks</th><th>+Orang/jam</th><th>Aktif</th><th></th></tr></thead>
+        <thead><tr><th>Room</th><th>Tarif/jam</th><th>Min jam</th><th>Kapasitas</th><th>Maks</th><th>+Orang</th><th>Aktif</th><th></th></tr></thead>
         <tbody>${rms.map(roomRow).join("")}</tbody>
     </table></div>
     <button class="btn btn-ghost btn-sm" data-addroom="${esc(l)}" type="button" style="margin-top:12px">${icon("add", 14)} Tambah room</button>
@@ -27,7 +27,7 @@ const lokBlock = (l, rms) => `<div class="lok-block" data-loksec="${esc(l)}">
     <div class="muted" data-qinfo="${esc(l)}" style="margin-top:8px"></div>
     <div data-qprev="${esc(l)}"></div>
     <input type="file" accept="image/*" data-qfile="${esc(l)}" style="margin-top:8px">
-    <div class="row-btns"><button class="btn btn-delete btn-sm" data-qdel="${esc(l)}" type="button">${icon("delete", 14)} Hapus QRIS</button></div>
+    <div data-qact="${esc(l)}"></div>
 
     <div class="row-btns" style="margin-top:16px;border-top:1px dashed var(--border-subtle);padding-top:16px">
         <button class="btn btn-delete btn-sm" data-removelok="${esc(l)}" type="button">${icon("delete_forever", 14)} Hapus cabang ini</button>
@@ -85,7 +85,7 @@ function getDiff(oldSt, nextSt, renames = {}, roomRenames = {}) {
                 if ((o.minDurasi || 1) !== r.minDurasi) diffs.push(`${l} - ${r.name}: minimal jam ${o.minDurasi || 1} → ${r.minDurasi}`);
                 if (o.baseCap !== r.baseCap) diffs.push(`${l} - ${r.name}: kapasitas berubah`);
                 if (o.maxCap !== r.maxCap) diffs.push(`${l} - ${r.name}: maksimal orang berubah`);
-                if (o.extraPrice !== r.extraPrice) diffs.push(`${l} - ${r.name}: +Orang/jam berubah`);
+                if (o.extraPrice !== r.extraPrice) diffs.push(`${l} - ${r.name}: biaya +Orang berubah`);
                 if (o.active !== r.active) diffs.push(`${l} - ${r.name}: status aktif berubah`);
             }
         });
@@ -114,7 +114,7 @@ export function renderSettings(el, S, H) {
       ${num("sTtl", st.pendingTtlHours, "Permintaan kedaluwarsa (jam)")}${num("sLead", st.minLeadMin, "Minimal booking sebelum main (menit)")}
       ${num("sMaxD", st.maxDurasi, "Durasi maksimal (jam)")}${num("sMic", st.micPrice, "Harga mic tambahan (Rp)", "", true)}
       <div class="form-group full-width"><label class="check"><input type="checkbox" id="sPerHour" ${st.addonPerHour ? "checked" : ""}><span>Biaya orang tambahan dihitung <b>per jam</b> (tidak dicentang = sekali bayar)</span></label></div>
-      <div class="form-group full-width"><label class="check"><input type="checkbox" id="sMicPerHour" ${st.micPerHour ? "checked" : ""}><span>Biaya mic dihitung <b>per jam</b> (tidak dicentang = sekali bayar sampai sesi selesai)</span></label></div>
+      <div class="form-group full-width"><label class="check"><input type="checkbox" id="sMicPerHour" ${st.micPerHour ? "checked" : ""}><span>Biaya mic dihitung <b>per jam</b> (tidak dicentang = sekali bayar)</span></label></div>
       <div class="form-group full-width"><label>WhatsApp admin</label><input id="sWa" inputmode="tel" value="${esc(st.adminWA || "")}" placeholder="08xxxxxxxxxx"></div>
       <div class="form-group full-width"><label>Kebijakan (tampil di halaman booking)</label><textarea id="sPolicy" rows="2">${esc(st.policy || "")}</textarea></div></div></details></div>
 
@@ -166,6 +166,8 @@ export function renderSettings(el, S, H) {
         const l = sec.dataset.loksec, q = S.qris[l];
         const infoEl = $(`[data-qinfo="${CSS.escape(l)}"]`, sec);
         const prevEl = $(`[data-qprev="${CSS.escape(l)}"]`, sec);
+        const actEl = $(`[data-qact="${CSS.escape(l)}"]`, sec);
+        if (actEl) actEl.innerHTML = q ? `<div class="row-btns"><button class="btn btn-delete btn-sm" data-qdel="${esc(l)}" type="button">${icon("delete", 14)} Hapus QRIS</button></div>` : "";
         if (infoEl) infoEl.textContent = q ? `Tersimpan: ${q.merchant || "(tanpa nama)"}` : "Belum ada QRIS";
         if (prevEl) prevEl.innerHTML = q ? (() => {
             try { return `<div class="qris-prev">${qrSvg(makeDynamic(q.payload, 1000))}</div><small class="hint" style="display:block; margin-top:6px">Contoh QR Rp 1.000 (hanya tes, jangan dibayar)</small>`; }
