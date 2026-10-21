@@ -287,7 +287,7 @@ function renderDetail(secret, b, fresh) {
                 <button class="btn btn-ghost" id="dlQr">${icon("download", 16)} Unduh QR</button>
               </div>
               <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia. Hubungi admin untuk cara bayar.</span></div>`}
-              <div class="proof"><label>Bukti pembayaran <small class="muted">(screenshot, opsional tapi disarankan)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" hidden>
+              <div class="proof"><label>Bukti pembayaran <small class="muted">(Wajib berupa screenshot)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" hidden>
               <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening">
               <button class="btn btn-save btn-block" id="paidBtn">${icon("task_alt")} Saya Sudah Bayar</button>
               <small class="muted">Tekan hanya setelah transfer berhasil. Admin akan mencocokkan dengan mutasi QRIS.</small></div>`;
@@ -355,13 +355,16 @@ function renderDetail(secret, b, fresh) {
         if (!confirm(b.status === "MENUNGGU_BAYAR" ? "Batalkan booking ini? Jika sudah transfer, hubungi admin dulu." : "Batalkan permintaan booking ini?")) return;
         try { await writeUser(secret, { status: "DIBATALKAN", cancelBy: "USER" }); toast("Booking dibatalkan", "success"); } catch (e) { toast("Gagal membatalkan", "error"); }
     });
+    
     let proof = null;
     $("#proofFile")?.addEventListener("change", async e => {
         const f = e.target.files[0]; if (!f) return;
         try { proof = await compressImage(f); const im = $("#proofPrev"); im.src = proof; im.hidden = false; } catch (x) { toast("Gambar tidak bisa dibaca", "error"); }
     });
     $("#paidBtn")?.addEventListener("click", async e => {
-        const btn = e.currentTarget; if (!confirm("Pastikan transfer sudah berhasil. Lanjut kirim konfirmasi?")) return;
+        const btn = e.currentTarget; 
+        if (!proof) return toast("Wajib melampirkan bukti pembayaran (screenshot)!", "error");
+        if (!confirm("Pastikan transfer sudah berhasil. Lanjut kirim konfirmasi?")) return;
         setBusy(btn, true, "Mengirim…");
         try {
             const batch = writeBatch(db);
