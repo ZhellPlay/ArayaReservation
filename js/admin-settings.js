@@ -1,5 +1,5 @@
 import { db, doc, setDoc } from "./fb.js";
-import { $, $$, esc, parseNum, normWA, icon, compressImage, qrSvg, toast, rupiah, DEFAULT_SETTINGS } from "./lib.js";
+import { $, $$, esc, parseNum, normWA, icon, compressImage, qrSvg, toast, rupiah, DEFAULT_SETTINGS, modal } from "./lib.js";
 import { validateQris, decodeQrFromFile, makeDynamic } from "./qris.js";
 
 const roomRow = r => `<tr data-row>
@@ -41,13 +41,65 @@ const TPL_NAMES = {
     confirmed: "Konfirmasi Pembayaran"
 };
 
+function getDiff(oldSt, nextSt) {
+    const diffs = [];
+    if (oldSt.dpPercent !== nextSt.dpPercent) diffs.push(`DP default: ${oldSt.dpPercent}% → ${nextSt.dpPercent}%`);
+    if (oldSt.holdMinutes !== nextSt.holdMinutes) diffs.push(`Batas bayar: ${oldSt.holdMinutes} mnt → ${nextSt.holdMinutes} mnt`);
+    if (oldSt.bufferMin !== nextSt.bufferMin) diffs.push(`Jeda antar sesi: ${oldSt.bufferMin} mnt → ${nextSt.bufferMin} mnt`);
+    if (oldSt.noShowGraceMin !== nextSt.noShowGraceMin) diffs.push(`Toleransi telat: ${oldSt.noShowGraceMin} mnt → ${nextSt.noShowGraceMin} mnt`);
+    if (oldSt.pendingTtlHours !== nextSt.pendingTtlHours) diffs.push(`Kedaluwarsa: ${oldSt.pendingTtlHours} jam → ${nextSt.pendingTtlHours} jam`);
+    if (oldSt.minLeadMin !== nextSt.minLeadMin) diffs.push(`Minimal booking: ${oldSt.minLeadMin} mnt → ${nextSt.minLeadMin} mnt`);
+    if (oldSt.maxDurasi !== nextSt.maxDurasi) diffs.push(`Durasi maksimal: ${oldSt.maxDurasi} jam → ${nextSt.maxDurasi} jam`);
+    if (oldSt.micPrice !== nextSt.micPrice) diffs.push(`Harga mic: Rp ${oldSt.micPrice} → Rp ${nextSt.micPrice}`);
+    if (oldSt.addonPerHour !== nextSt.addonPerHour) diffs.push(`Biaya tambahan per jam: ${oldSt.addonPerHour ? "Ya" : "Tidak"} → ${nextSt.addonPerHour ? "Ya" : "Tidak"}`);
+    if (oldSt.adminWA !== nextSt.adminWA) diffs.push(`WA Admin diperbarui`);
+    if (oldSt.policy !== nextSt.policy) diffs.push(`Teks Kebijakan diperbarui`);
+    
+    const addedLok = nextSt.lokasi.filter(l => !oldSt.lokasi.includes(l));
+    const removedLok = oldSt.lokasi.filter(l => !nextSt.lokasi.includes(l));
+    addedLok.forEach(l => diffs.push(`Menambah cabang: ${l}`));
+    removedLok.forEach(l => diffs.push(`Menghapus cabang: ${l}`));
+    
+    nextSt.lokasi.forEach(l => {
+        if (!oldSt.lokasi.includes(l)) return;
+        const oldRooms = oldSt.rooms[l] || [];
+        const newRooms = nextSt.rooms[l] || [];
+        
+        const addedR = newRooms.filter(r => !oldRooms.find(o => o.name === r.name));
+        const removedR = oldRooms.filter(r => !newRooms.find(n => n.name === r.name));
+        addedR.forEach(r => diffs.push(`Cabang ${l}: tambah room ${r.name}`));
+        removedR.forEach(r => diffs.push(`Cabang ${l}: hapus room ${r.name}`));
+        
+        newRooms.forEach(r => {
+            const o = oldRooms.find(x => x.name === r.name);
+            if (o) {
+                if (o.rate !== r.rate) diffs.push(`${l} - ${r.name}: tarif berubah`);
+                if (o.baseCap !== r.baseCap) diffs.push(`${l} - ${r.name}: kapasitas berubah`);
+                if (o.maxCap !== r.maxCap) diffs.push(`${l} - ${r.name}: maksimal orang berubah`);
+                if (o.extraPrice !== r.extraPrice) diffs.push(`${l} - ${r.name}: +Orang/jam berubah`);
+                if (o.active !== r.active) diffs.push(`${l} - ${r.name}: status aktif berubah`);
+            }
+        });
+    });
+
+    const h1 = JSON.stringify(oldSt.holidays || []), h2 = JSON.stringify(nextSt.holidays || []);
+    if (h1 !== h2) diffs.push(`Daftar hari libur berubah`);
+    
+    const tplChanged = Object.keys(nextSt.templates).some(k => oldSt.templates[k] !== nextSt.templates[k]);
+    if (tplChanged) diffs.push(`Template pesan WhatsApp diperbarui`);
+
+    return diffs;
+}
+
 export function renderSettings(el, S, H) {
     const st = S.st;
     let hol = [...(st.holidays || [])];
+    S.dirty = false;
+    
     const num = (id, v, label, hint = "") => `<div class="form-group"><label>${label}</label><input id="${id}" inputmode="decimal" value="${v ?? ""}">${hint ? `<small class="hint" style="margin-top:4px">${hint}</small>` : ""}</div>`;
 
     el.innerHTML = `
-    <div class="form-card"><details open class="set-sec"><summary>${icon("tune")} Umum &amp; Kebijakan</summary><div class="form-grid">
+    <div class="form-card"><details class="set-sec"><summary>${icon("tune")} <span style="flex:1;text-align:left">Umum &amp; Kebijakan</span></summary><div class="form-grid">
       ${num("sDp", st.dpPercent, "DP default (%)")}${num("sHold", st.holdMinutes, "Batas bayar (menit)", "Setelah disetujui, slot ditahan sampai batas ini.")}
       ${num("sBuf", st.bufferMin, "Jeda antar sesi (menit)")}${num("sGrace", st.noShowGraceMin, "Toleransi telat (menit)")}
       ${num("sTtl", st.pendingTtlHours, "Permintaan kedaluwarsa (jam)")}${num("sLead", st.minLeadMin, "Minimal booking sebelum main (menit)")}
@@ -56,7 +108,7 @@ export function renderSettings(el, S, H) {
       <div class="form-group full-width"><label>WhatsApp admin</label><input id="sWa" inputmode="tel" value="${esc(st.adminWA || "")}" placeholder="08xxxxxxxxxx"></div>
       <div class="form-group full-width"><label>Kebijakan (tampil di halaman booking)</label><textarea id="sPolicy" rows="2">${esc(st.policy || "")}</textarea></div></div></details></div>
 
-    <div class="form-card"><details open class="set-sec"><summary>${icon("store")} Cabang (Lokasi)</summary>
+    <div class="form-card"><details class="set-sec"><summary>${icon("store")} <span style="flex:1;text-align:left">Cabang (Lokasi)</span></summary>
       <p class="muted" style="margin-bottom:16px">Default 1 cabang dengan 1 room. Tambah atau hapus sesuai kebutuhan. Minimal 1 cabang dan 1 room per cabang.</p>
       <div id="lokList">${st.lokasi.map(l => lokBlock(l, st.rooms[l] || [])).join("")}</div>
       <div class="add-lok">
@@ -65,7 +117,7 @@ export function renderSettings(el, S, H) {
       </div>
     </details></div>
 
-    <div class="form-card"><details class="set-sec"><summary>${icon("event_busy")} Hari Libur / Tutup</summary>
+    <div class="form-card"><details class="set-sec"><summary>${icon("event_busy")} <span style="flex:1;text-align:left">Hari Libur / Tutup</span></summary>
       <p class="muted" style="margin-bottom:16px">Tanggal tutup tidak bisa dipilih pelanggan.</p>
       <div id="holList"></div>
       <div class="form-grid" style="margin-top:16px"><div class="form-group"><label>Tanggal</label><input type="date" id="hDate"></div>
@@ -73,7 +125,7 @@ export function renderSettings(el, S, H) {
       <div class="form-group full-width"><label>Alasan</label><input id="hWhy" placeholder="mis. HUT Araya"></div></div>
       <button class="btn btn-ghost" id="hAdd" type="button" style="margin-top:12px">${icon("add", 16)} Tambah libur</button></details></div>
 
-    <div class="form-card"><details class="set-sec"><summary>${icon("template_add")} Template Pesan WhatsApp</summary>
+    <div class="form-card"><details class="set-sec"><summary>${icon("sms")} <span style="flex:1;text-align:left">Template Pesan WhatsApp</span></summary>
       <div class="est" style="margin-bottom:20px; border-color:var(--border-medium)">
         <b>Variabel yang tersedia:</b><br>
         <span class="muted" style="line-height:1.8; word-break:break-word; display:inline-block; margin-top:6px">{nama} · {lokasi} · {room} · {tanggal} · {jam} · {nominal} · {deadline} · {link} · {kode} · {alasan} · {site}</span>
@@ -88,9 +140,12 @@ export function renderSettings(el, S, H) {
 
     <button class="btn btn-save btn-block" id="setSave">${icon("save")} Simpan Pengaturan</button>
 
-    <div class="form-card"><details class="set-sec"><summary>${icon("build")} Perawatan Data</summary>
+    <div class="form-card"><details class="set-sec"><summary>${icon("build")} <span style="flex:1;text-align:left">Perawatan Data</span></summary>
       <p class="muted" style="margin-bottom:16px">Ekspor dulu, lalu bersihkan booking lama (&gt; 30 hari) untuk menghemat kuota Firebase.</p>
       <div class="row-btns"><button class="btn btn-ghost" id="mExp">${icon("download", 16)} Ekspor CSV</button><button class="btn btn-delete" id="mClean">${icon("delete_sweep", 16)} Bersihkan data lama</button></div></details></div>`;
+
+    el.addEventListener("input", () => S.dirty = true);
+    el.addEventListener("change", () => S.dirty = true);
 
     const drawQ = () => $$("[data-loksec]", el).forEach(sec => {
         const l = sec.dataset.loksec, q = S.qris[l];
@@ -107,18 +162,19 @@ export function renderSettings(el, S, H) {
         $("#holList", el).innerHTML = hol.length
             ? hol.sort((a, b) => a.date.localeCompare(b.date)).map((h, i) => `<div class="kv"><span>${esc(h.date)} · ${esc(h.lokasi === "ALL" ? "Semua" : h.lokasi)}</span><b>${esc(h.alasan || "-")} <button class="btn btn-ghost btn-sm" data-hdel="${i}" type="button" style="padding:4px; min-height:24px;">${icon("close", 14)}</button></b></div>`).join("")
             : `<p class="muted">Belum ada hari libur.</p>`;
-        $$("[data-hdel]", el).forEach(b => b.onclick = () => { hol.splice(+b.dataset.hdel, 1); drawHol(); });
+        $$("[data-hdel]", el).forEach(b => b.onclick = () => { hol.splice(+b.dataset.hdel, 1); drawHol(); S.dirty = true; });
     };
 
     drawQ(); drawHol();
 
     el.onclick = e => {
         const delrow = e.target.closest("[data-delrow]");
-        if (delrow) { delrow.closest("tr").remove(); return; }
+        if (delrow) { delrow.closest("tr").remove(); S.dirty = true; return; }
         const addroom = e.target.closest("[data-addroom]");
         if (addroom) {
             const tbl = $(`table[data-lok="${CSS.escape(addroom.dataset.addroom)}"] tbody`, el);
             if (tbl) tbl.insertAdjacentHTML("beforeend", roomRow({ name: "", rate: 0, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }));
+            S.dirty = true;
             return;
         }
         const removelok = e.target.closest("[data-removelok]");
@@ -127,6 +183,7 @@ export function renderSettings(el, S, H) {
             if ($$("[data-loksec]", el).length <= 1) return toast("Minimal 1 cabang", "error");
             if (!confirm(`Hapus cabang "${l}"?`)) return;
             removelok.closest("[data-loksec]").remove();
+            S.dirty = true;
             return;
         }
         const qdel = e.target.closest("[data-qdel]");
@@ -141,7 +198,7 @@ export function renderSettings(el, S, H) {
             return;
         }
         const hdel = e.target.closest("[data-hdel]");
-        if (hdel) { hol.splice(+hdel.dataset.hdel, 1); drawHol(); }
+        if (hdel) { hol.splice(+hdel.dataset.hdel, 1); drawHol(); S.dirty = true; }
     };
 
     el.onchange = async e => {
@@ -166,13 +223,14 @@ export function renderSettings(el, S, H) {
         $("#lokList", el).insertAdjacentHTML("beforeend", lokBlock(name, [{ name: "Room 1", rate: 0, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }]));
         $("#lokNew", el).value = "";
         drawQ();
+        S.dirty = true;
         toast("Cabang ditambahkan. Jangan lupa Simpan.", "info");
     };
 
     $("#hAdd", el).onclick = () => {
         const date = $("#hDate", el).value; if (!date) return toast("Pilih tanggal", "error");
         hol.push({ date, lokasi: $("#hLok", el).value, alasan: $("#hWhy", el).value.trim() });
-        $("#hWhy", el).value = ""; drawHol(); toast("Libur ditambahkan. Jangan lupa Simpan.", "info");
+        $("#hWhy", el).value = ""; drawHol(); S.dirty = true; toast("Libur ditambahkan. Jangan lupa Simpan.", "info");
     };
 
     $("#mExp", el).onclick = H.exportCsv;
@@ -205,18 +263,44 @@ export function renderSettings(el, S, H) {
         };
         if (next.dpPercent < 1 || next.dpPercent > 100) return toast("DP harus 1–100%", "error");
         $$("[data-tpl]", el).forEach(t => next.templates[t.dataset.tpl] = t.value);
-        e.currentTarget.disabled = true;
-        try {
-            await setDoc(doc(db, "config", "settings"), next);
-            Object.assign(S.st, next);
-            S.needSeed = false;
-            const removedLok = st.lokasi.filter(l => !nextLokasi.includes(l));
-            if (removedLok.some(l => S.qris[l])) {
-                removedLok.forEach(l => { if (S.qris[l]) delete S.qris[l]; });
-                await setDoc(doc(db, "config", "qris"), S.qris);
-            }
-            toast("Pengaturan tersimpan", "success");
-        } catch (err) { toast("Gagal menyimpan: " + (err.code || err.message), "error"); }
-        e.currentTarget.disabled = false;
+        
+        const diffs = getDiff(st, next);
+        if (!diffs.length) {
+            S.dirty = false;
+            return toast("Tidak ada perubahan", "info");
+        }
+
+        const m = modal(`
+            <h3>${icon("save")} Simpan Perubahan?</h3>
+            <p>Berikut adalah perubahan yang akan disimpan:</p>
+            <div style="max-height: 30vh; overflow-y: auto; margin-bottom: 20px; text-align: left; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle);">
+                <ul style="margin-left: 16px; color: var(--text-secondary); font-size: 14px; line-height: 1.6;">
+                    ${diffs.map(d => `<li>${esc(d)}</li>`).join("")}
+                </ul>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" data-close>Batal</button>
+                <button class="btn btn-save" id="confirmSave">Simpan</button>
+            </div>
+        `);
+        
+        $("#confirmSave", m.el).onclick = async () => {
+            m.close();
+            e.currentTarget.disabled = true;
+            try {
+                await setDoc(doc(db, "config", "settings"), next);
+                Object.assign(S.st, next);
+                S.needSeed = false;
+                S.dirty = false;
+                
+                const removedLok = st.lokasi.filter(l => !nextLokasi.includes(l));
+                if (removedLok.some(l => S.qris[l])) {
+                    removedLok.forEach(l => { if (S.qris[l]) delete S.qris[l]; });
+                    await setDoc(doc(db, "config", "qris"), S.qris);
+                }
+                toast("Pengaturan tersimpan", "success");
+            } catch (err) { toast("Gagal menyimpan: " + (err.code || err.message), "error"); }
+            e.currentTarget.disabled = false;
+        };
     };
 }

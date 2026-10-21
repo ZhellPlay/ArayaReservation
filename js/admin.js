@@ -11,7 +11,7 @@ import { applyTx } from "./avail.js";
 import { renderSettings } from "./admin-settings.js";
 
 const H = 3600000, root = $("#root");
-export const S = { st: mergeSettings(null), qris: {}, bookings: [], byBid: new Map(), tab: "inbox", loc: "ALL", f: { status: "AKTIF", day: "ALL", sort: "main", q: "" }, hist: 3 };
+export const S = { st: mergeSettings(null), qris: {}, bookings: [], byBid: new Map(), tab: "inbox", f: { lokasi: "ALL", status: "AKTIF", day: "ALL", sort: "main", q: "" }, hist: 3, dirty: false };
 let unsubB = null, firstSnap = true, scanStream = null;
 
 const bufMs = () => (S.st.bufferMin || 0) * 60000;
@@ -27,6 +27,10 @@ const addOf = (b, status = b.status, deadline = b.payDeadline) => { const k = ki
 const refOf = b => doc(db, "bookings", b.id);
 const rangeTxt = b => `${b.jamMulai}–${witaTime(b.endMs)}`;
 const isOpen = s => ["PENDING", "MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"].includes(s);
+
+window.addEventListener("beforeunload", (e) => {
+    if (S.dirty) { e.preventDefault(); e.returnValue = ""; }
+});
 
 function showLogin(msg = "") {
     root.innerHTML = `<div class="panel login-box"><h3 style="justify-content:center">${icon("lock")} Khusus Admin</h3><p class="muted">${esc(msg) || "Masuk dengan akun Google admin."}</p>
@@ -50,11 +54,20 @@ async function startApp(user) {
     startBackground(); syncClock();
     try { const s = await getDoc(doc(db, "config", "settings")); if (s.exists()) S.st = mergeSettings(s.data()); else S.needSeed = true; } catch (e) { }
     try { const s = await getDoc(doc(db, "config", "qris")); if (s.exists()) S.qris = s.data(); } catch (e) { }
-    root.innerHTML = `<div class="admin-bar"><div class="muted">${esc(user.email)}</div><div class="row-btns" style="margin:0">
-      <button class="btn btn-save" id="addBtn" style="flex:0 0 auto;padding:10px 14px">${icon("add")} Walk-in / Manual</button>
-      <button class="btn btn-ghost" id="outBtn" style="padding:10px 14px">${icon("logout", 18)}</button></div></div>
+    
+    root.innerHTML = `<div class="admin-bar">
+      <div class="admin-user">
+        <span class="material-icons-round">account_circle</span>
+        <span class="admin-email">${esc(user.email)}</span>
+      </div>
+      <div class="row-btns" style="margin:0">
+        <button class="btn btn-save" id="addBtn" style="flex:0 0 auto;padding:10px 14px">${icon("add")} Walk-in / Manual</button>
+        <button class="btn btn-ghost" id="outBtn" style="padding:10px 14px">${icon("logout", 18)}</button>
+      </div>
+    </div>
       ${S.needSeed ? `<div class="banner warn">${icon("settings")}<span>Pengaturan belum disimpan. Buka tab <b>Pengaturan</b>, isi tarif &amp; QRIS, lalu Simpan.</span></div>` : ""}
       <div class="tabs" id="tabs"></div><div id="tools"></div><div id="body"></div>`;
+      
     $("#outBtn").onclick = () => signOut(auth);
     $("#addBtn").onclick = () => manualModal();
     $("#body").addEventListener("click", onBodyClick);
@@ -78,7 +91,7 @@ function beep() { try { const c = new (window.AudioContext || window.webkitAudio
 
 const TABS = [["inbox", "inbox", "Perlu Tindakan"], ["list", "list_alt", "Semua Booking"], ["scan", "qr_code_scanner", "Check-in"], ["settings", "settings", "Pengaturan"]];
 const inboxItems = () => S.bookings.filter(b => locOk(b) && ["PENDING", "MENUNGGU_VERIFIKASI"].includes(eff(b)));
-const locOk = b => S.loc === "ALL" || b.lokasi === S.loc;
+const locOk = b => S.f.lokasi === "ALL" || b.lokasi === S.f.lokasi;
 
 function renderTabs() {
     const n = inboxItems().length;
@@ -88,21 +101,41 @@ function renderTabs() {
 }
 
 function setTab(t) {
+    if (S.tab === "settings" && t !== "settings" && S.dirty) {
+        const m = modal(`
+            <div class="modal-icon" style="background:var(--warning-soft); color:var(--warning); border-color:var(--warning-border)"><span class="material-icons-round">warning</span></div>
+            <h3>Perubahan Belum Disimpan</h3>
+            <p>Kamu memiliki perubahan pengaturan yang belum disimpan. Apa yang ingin kamu lakukan?</p>
+            <div class="modal-actions" style="flex-direction:column-reverse; gap:8px">
+                <button class="btn btn-ghost" id="btnDiscard">Tinggalkan tanpa simpan</button>
+                <button class="btn btn-save" id="btnSave">Simpan Pengaturan</button>
+            </div>
+        `, { sticky: true });
+        $("#btnDiscard", m.el).onclick = () => {
+            S.dirty = false;
+            m.close();
+            setTab(t);
+        };
+        $("#btnSave", m.el).onclick = () => {
+            m.close();
+            document.getElementById("setSave")?.click();
+        };
+        return;
+    }
+
     if (S.tab === "scan" && t !== "scan") stopScan();
     S.tab = t; renderTabs();
     const tools = $("#tools");
-    const locSeg = ["inbox", "list"].includes(t) ? `<div class="seg">${["ALL", ...S.st.lokasi].map(l => `<button data-loc="${esc(l)}" class="${S.loc === l ? "on" : ""}">${l === "ALL" ? "Semua" : esc(l)}</button>`).join("")}</div>` : "";
     
     let extra = "";
     if (t === "list") {
-        const hasFilter = S.f.status !== "AKTIF" || S.f.day !== "ALL" || S.f.sort !== "main";
+        const hasFilter = S.f.status !== "AKTIF" || S.f.day !== "ALL" || S.f.sort !== "main" || (S.st.lokasi.length > 1 && S.f.lokasi !== "ALL");
         extra = `<input id="fQ" placeholder="Cari nama / WA / kode" value="${esc(S.f.q)}">
           <button class="btn btn-ghost ${hasFilter ? 'filter-active' : ''}" id="btnFilter" title="Filter & Urutkan">${icon("tune", 18)}</button>`;
     }
     
-    tools.innerHTML = t === "settings" || t === "scan" ? "" : `<div class="filters">${locSeg}${extra}</div>`;
+    tools.innerHTML = t === "settings" || t === "scan" ? "" : `<div class="filters">${extra}</div>`;
     
-    $$("[data-loc]", tools).forEach(b => b.onclick = () => { S.loc = b.dataset.loc; setTab(S.tab); });
     $("#fQ")?.addEventListener("input", e => { S.f.q = e.target.value; renderBody(); });
     $("#btnFilter")?.addEventListener("click", filterModal);
 
@@ -112,8 +145,13 @@ function setTab(t) {
 
 function filterModal() {
     const f = S.f;
+    const multiLok = S.st.lokasi.length > 1;
     const m = modal(`<h3>${icon("tune")} Filter & Urutkan</h3>
         <div class="form-grid" style="grid-template-columns: 1fr; gap:16px; margin-top:20px;">
+            ${multiLok ? `<div class="form-group"><label>Cabang</label><select id="mfLokasi">
+                <option value="ALL" ${f.lokasi === "ALL" ? "selected" : ""}>Semua Cabang</option>
+                ${S.st.lokasi.map(l => `<option value="${esc(l)}" ${f.lokasi === l ? "selected" : ""}>${esc(l)}</option>`).join("")}
+            </select></div>` : ""}
             <div class="form-group"><label>Status</label><select id="mfStatus">${[["AKTIF", "Aktif"], ["SEMUA", "Semua status"], ...Object.entries(STATUS).map(([k, v]) => [k, v[0]])].map(([k, l]) => `<option value="${k}" ${f.status === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
             <div class="form-group"><label>Tanggal</label><select id="mfDay">${[["ALL", "Semua tanggal"], ["TODAY", "Hari ini"], ["TOM", "Besok"], ["WEEK", "7 hari ke depan"]].map(([k, l]) => `<option value="${k}" ${f.day === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
             <div class="form-group"><label>Urutkan</label><select id="mfSort"><option value="main" ${f.sort === "main" ? "selected" : ""}>Waktu main</option><option value="masuk" ${f.sort === "masuk" ? "selected" : ""}>Terbaru masuk</option></select></div>
@@ -123,11 +161,13 @@ function filterModal() {
             <button class="btn btn-save" id="mfApply">Terapkan</button>
         </div>`);
     $("#mfReset", m.el).onclick = () => {
+        if (multiLok) $("#mfLokasi", m.el).value = "ALL";
         $("#mfStatus", m.el).value = "AKTIF";
         $("#mfDay", m.el).value = "ALL";
         $("#mfSort", m.el).value = "main";
     };
     $("#mfApply", m.el).onclick = () => {
+        if (multiLok) S.f.lokasi = $("#mfLokasi", m.el).value;
         S.f.status = $("#mfStatus", m.el).value;
         S.f.day = $("#mfDay", m.el).value;
         S.f.sort = $("#mfSort", m.el).value;
@@ -202,7 +242,7 @@ function listHTML() {
         ${q.length >= 3 ? `<button class="btn btn-ghost btn-sm" data-act="deepsearch" style="padding:4px 10px; min-height:0; height:auto; font-size:12px">Cari di riwayat</button>` : ""}
     </div>`;
     
-    const showGroups = S.loc === "ALL" && S.st.lokasi.length > 1;
+    const showGroups = S.f.lokasi === "ALL" && S.st.lokasi.length > 1;
     if (!showGroups) return info + gridOf(arr, "Tidak ada booking yang cocok.");
     
     const groups = S.st.lokasi.map(l => {
