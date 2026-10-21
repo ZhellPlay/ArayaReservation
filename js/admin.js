@@ -567,13 +567,16 @@ async function sweep() {
 }
 
 function renderScan() {
-    $("#body").innerHTML = `<div class="panel"><h3>${icon("qr_code_scanner")} Scan QR pelanggan</h3>
-      <div class="scan-row">
-        <button class="btn btn-save" id="scanToggle" type="button"></button>
-        <div class="form-group"><label for="scanQ">Atau cari manual</label><input id="scanQ" placeholder="Nama / WA / kode booking"></div>
-      </div>
-      <div class="scan-wrap" id="scanWrap" hidden><video id="scanVid" playsinline muted></video></div></div>
-      <div id="scanRes"></div><div class="section-header"><div class="section-title">${icon("today", 22)} Terkonfirmasi hari ini</div></div><div id="scanList"></div>`;
+    $("#body").innerHTML = `<div class="panel">
+        <h3>${icon("qr_code_scanner")} Scan QR pelanggan</h3>
+        <button class="btn btn-save btn-block" id="scanToggle" type="button" style="margin-top: var(--space-md);"></button>
+        <div class="scan-wrap" id="scanWrap" hidden><video id="scanVid" playsinline muted></video></div>
+        <div class="divider-text"><span>Atau Cari Manual</span></div>
+        <div class="form-group" style="margin: 0;"><input id="scanQ" placeholder="Nama / WA / kode booking"></div>
+    </div>
+    <div id="scanRes"></div>
+    <div class="section-header"><div class="section-title">${icon("today", 22)} Terkonfirmasi hari ini</div></div>
+    <div id="scanList"></div>`;
     setScanUi(false);
     $("#scanToggle").onclick = () => scanStream || scanStarting ? stopScan() : startScan();
     $("#scanQ").addEventListener("input", e => renderScanList(e.target.value));

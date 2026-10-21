@@ -148,7 +148,7 @@ export function renderSettings(el, S, H) {
           </div>`).join("")}
       </div></details></div>
 
-    <button class="btn btn-save btn-block" id="setSave">${icon("save")} Simpan Pengaturan</button>
+    <button class="btn btn-save btn-block" id="setSave" style="margin-top: 0; margin-bottom: var(--space-xl);">${icon("save")} Simpan Pengaturan</button>
 
     <div class="form-card"><details class="set-sec"><summary>${icon("build")} <span style="flex:1;text-align:left">Perawatan Data</span></summary>
       <p class="muted" style="margin-bottom:16px">Ekspor dulu, lalu bersihkan booking lama (&gt; 30 hari) untuk menghemat kuota Firebase.</p>
@@ -241,7 +241,7 @@ export function renderSettings(el, S, H) {
         if (!name) return toast("Isi nama cabang", "error");
         if (name.length > 30) return toast("Nama cabang maksimal 30 karakter", "error");
         if ($$(`[data-loksec="${CSS.escape(name)}"]`, el).length) return toast("Cabang sudah ada", "error");
-        $("#lokList", el).insertAdjacentHTML("beforeend", lokBlock(name, [{ name: "Room 1", rate: 0, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }]));
+        $("#lokList", el).insertAdjacentHTML("beforeend", lokBlock(name, [{ name: "Room 1", rate: 0, minDurasi: 1, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }]));
         $("#lokNew", el).value = "";
         drawQ();
         S.dirty = true;
