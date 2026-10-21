@@ -61,8 +61,8 @@ async function startApp(user) {
         <span class="admin-email">${esc(user.email)}</span>
       </div>
       <div class="admin-actions">
-        <button class="btn btn-save" id="addBtn" style="padding:10px 14px">${icon("add")} Walk-in / Manual</button>
-        <button class="btn btn-ghost" id="outBtn" style="padding:10px 14px">${icon("logout", 18)}</button>
+        <button class="btn btn-save" id="addBtn">${icon("add", 16)} Walk-in</button>
+        <button class="btn btn-ghost" id="outBtn">${icon("logout", 16)}</button>
       </div>
     </div>
       ${S.needSeed ? `<div class="banner warn">${icon("settings")}<span>Pengaturan belum disimpan. Buka tab <b>Pengaturan</b>, isi tarif &amp; QRIS, lalu Simpan.</span></div>` : ""}

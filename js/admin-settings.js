@@ -273,8 +273,8 @@ export function renderSettings(el, S, H) {
         const m = modal(`
             <h3>${icon("save")} Simpan Perubahan?</h3>
             <p>Berikut adalah perubahan yang akan disimpan:</p>
-            <div style="max-height: 30vh; overflow-y: auto; margin-bottom: 20px; text-align: left; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle);">
-                <ul style="margin-left: 16px; color: var(--text-secondary); font-size: 14px; line-height: 1.6;">
+            <div style="max-height: 30vh; overflow-y: auto; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle);">
+                <ul style="list-style-position: inside; text-align: center; color: var(--text-secondary); font-size: 14px; line-height: 1.8; padding: 0; margin: 0;">
                     ${diffs.map(d => `<li>${esc(d)}</li>`).join("")}
                 </ul>
             </div>
