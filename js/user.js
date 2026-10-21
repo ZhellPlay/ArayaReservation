@@ -278,10 +278,12 @@ function renderDetail(secret, b, fresh) {
       <div class="kv"><span>Jam</span><b>${esc(b.jamMulai)} – ${esc(witaTime(b.endMs))} (${b.durasi} jam)</b></div>
       <div class="kv"><span>Orang</span><b>${b.orang}${extra ? ` (+${extra} tambahan)` : ""}</b></div>${b.mic ? `<div class="kv"><span>Mic tambahan</span><b>${b.mic}</b></div>` : ""}
       <div class="kv"><span>Atas nama</span><b>${esc(b.nama)}</b></div>${b.catatan ? `<div class="kv"><span>Catatan</span><b>${esc(b.catatan)}</b></div>` : ""}${money}</div>
-    <div class="panel"><h3>${icon("bookmark")} Simpan akses booking ini</h3><p class="muted">Link ini rahasia, jangan dibagikan ke orang lain. Kalau hilang, cari lagi pakai kode + nomor WA.</p>
-      <div class="row-btns"><button class="btn btn-ghost" id="copyLink">${icon("link", 16)} Salin link</button>
-      <a class="btn btn-wa" target="_blank" rel="noopener" href="${waLink(b.wa, `Link booking ARAYA GAMESTATION (jangan dibagikan)\nKode: ${b.kode}\n${link}`)}">${icon("chat", 16)} Kirim ke WA saya</a>
-      ${adminWA ? `<a class="btn btn-ghost" target="_blank" rel="noopener" href="${adminWA}">${icon("support_agent", 16)} Hubungi admin</a>` : ""}</div></div>
+    <div class="panel"><h3>${icon("bookmark")} Akses Booking &amp; Bantuan</h3><p class="muted">Link ini rahasia. Simpan link agar kamu bisa mengecek status booking kapan saja. Jika link hilang atau butuh bantuan, silakan hubungi admin.</p>
+      <div class="row-btns" style="justify-content: center; gap: 12px;">
+        <button class="btn btn-ghost" id="copyLink">${icon("link", 16)} Salin Link</button>
+        ${adminWA ? `<a class="btn btn-wa" target="_blank" rel="noopener" href="${adminWA}">${icon("support_agent", 16)} Hubungi WA Admin</a>` : ""}
+      </div>
+    </div>
     ${canCancel ? `<button class="btn btn-delete btn-block" id="cancelBtn">${icon("close", 16)} Batalkan booking</button>` : ""}
     <p class="muted center" style="margin-top:14px">${esc(ST.policy)}</p>`;
     if (fresh) sessionStorage.removeItem("araya_new");
