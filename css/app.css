@@ -225,7 +225,11 @@ label.check input[type="checkbox"] { margin-top: 1px; }
 .modal-card.wide > p { text-align: left; }
 .modal-card.wide .form-grid { margin: var(--space-md) 0; }
 
-.scan-wrap { position: relative; max-width: 420px; margin: 0 auto; background: #000; }
+.scan-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-md); margin-top: var(--space-md); }
+.scan-row .btn { flex: 0 0 auto; }
+.scan-row .form-group { flex: 1 1 120px; min-width: 0; margin: 0; }
+#scanToggle, #scanQ { min-height: 50px; }
+.scan-wrap { position: relative; max-width: 420px; margin: var(--space-lg) auto 0; background: #000; }
 .scan-wrap video { width: 100%; display: block; max-height: 60vh; max-height: 60dvh; object-fit: cover; }
 .scan-wrap::after {
     content: ""; position: absolute; inset: 18%; border: 2px solid var(--accent-2);
@@ -318,4 +322,9 @@ label.check input[type="checkbox"] { margin-top: 1px; }
         font-size: 11px; line-height: 1.15; text-align: center; justify-content: center;
     }
     .tab .badge { position: absolute; top: 3px; right: 3px; padding: 0 6px; font-size: 10px; }
+}
+
+@media (max-width: 480px) {
+    .scan-row { gap: var(--space-sm); }
+    .scan-row .btn { padding: 0 14px; font-size: 13px; }
 }
