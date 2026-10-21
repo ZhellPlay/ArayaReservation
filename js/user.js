@@ -54,7 +54,9 @@ async function viewHome() {
     <a class="btn btn-save btn-block" href="#/new">${icon("add_circle")} Booking Baru</a>
     <div class="section-header" style="margin-top:34px"><div class="section-title">${icon("confirmation_number", 22)} Booking Saya</div><span class="count-badge">${list.length}</span></div>
     <div class="booking-grid" id="myList">${list.length ? "" : `<div class="empty-state"><span class="material-icons-round">event_busy</span><p>Belum ada booking di perangkat ini</p></div>`}</div>
-    <p class="muted center" style="margin-top:28px">Ganti HP atau link hilang? <a href="#/find">Cari booking pakai kode</a></p>`;
+    <div class="row-btns" style="margin-top:32px; justify-content: center;">
+        <a class="btn btn-ghost" href="#/find">${icon("search")} Cari Booking (Link Hilang)</a>
+    </div>`;
     const box = $("#myList");
     list.forEach((it, i) => {
         const card = document.createElement("div"); card.className = "booking-card"; card.style.animationDelay = i * .05 + "s";
@@ -80,7 +82,10 @@ function cardInner(b, st) {
       <div class="detail-item">${icon("event", 16)}<span class="val">${esc(b.tanggal ? fmtDate(b.tanggal, false) : "")} · ${esc(b.jamMulai || b.jam || "")}</span></div>
     </div>
     <div class="divider"></div>
-    <div class="action-buttons"><span class="muted">Lihat detail ›</span><button class="btn btn-ghost btn-sm" data-forget title="Hapus dari perangkat ini">${icon("close", 14)}</button></div>`;
+    <div class="action-buttons" style="justify-content: space-between; align-items: center;">
+        <span class="btn btn-ghost btn-sm" style="pointer-events:none">${icon("visibility", 14)} Lihat Detail</span>
+        <button class="btn btn-delete btn-sm" data-forget title="Hapus dari perangkat ini">${icon("close", 14)}</button>
+    </div>`;
 }
 
 function viewFind() {
@@ -91,7 +96,8 @@ function viewFind() {
       <div class="form-group full-width"><label>WhatsApp</label><input id="q-wa" inputmode="tel" placeholder="08xxxxxxxxxx"></div>
     </div>
     <div class="form-actions"><button class="btn btn-save" id="q-go">${icon("search")} Cari</button></div>
-    <p class="muted center" style="margin-top:16px"><a href="#/">‹ Kembali</a></p></div>`;
+    <div class="row-btns" style="margin-top:16px"><a href="#/" class="btn btn-ghost btn-block">${icon("arrow_back")} Kembali</a></div>
+    </div>`;
     $("#q-go").onclick = async e => {
         const btn = e.currentTarget, kode = normKode($("#q-kode").value), wa = normWA($("#q-wa").value);
         if (!kode || !validWA(wa)) return toast("Cek lagi kode dan nomor WA-nya", "error");
@@ -133,7 +139,8 @@ function viewForm() {
     </div>
     <div class="form-actions"><button class="btn btn-save" id="f-submit">${icon("send")} Ajukan Booking</button></div>
     <p class="muted center" style="margin-top:14px">Mengajukan ≠ dapat slot. Slot dikunci setelah admin menyetujui.</p>
-    <p class="muted center"><a href="#/">‹ Kembali</a></p></div>`;
+    <div class="row-btns" style="margin-top:16px"><a href="#/" class="btn btn-ghost btn-block">${icon("arrow_back")} Kembali</a></div>
+    </div>`;
 
     let jam = null;
     const rd = () => ({
@@ -163,7 +170,7 @@ function viewForm() {
         const p = calcPrice(ST, r, v.durasi, v.orang, v.mic);
         est.innerHTML = r.rate ? `
           <div class="kv"><span>Room ${v.durasi} jam</span><b>${rupiah(p.base)}</b></div>
-          ${p.extraN ? `<div class="kv"><span>${p.extraN} orang tambahan</span><b>${rupiah(p.extra)}</b></div>` : ""}
+          ${p.extraN ? `<div class="kv"><span>${p.extraN} orang tambahan${ST.addonPerHour ? ` × ${v.durasi} jam` : ""}</span><b>${rupiah(p.extra)}</b></div>` : ""}
           ${v.mic ? `<div class="kv"><span>${v.mic} mic${ST.micPerHour ? ` × ${v.durasi} jam` : ""}</span><b>${rupiah(p.micT)}</b></div>` : ""}
           <div class="kv"><span>Estimasi total</span><b>${rupiah(p.total)}</b></div>
           <div class="kv highlight"><span>DP yang perlu dibayar (${ST.dpPercent}%)</span><b>${rupiah(p.dp)}</b></div>
@@ -311,18 +318,18 @@ function renderDetail(secret, b, fresh, ui) {
         body += `</div>`;
     }
     if (eff === "KEDALUWARSA" && b.status === "MENUNGGU_BAYAR") body += `<div class="panel"><h3>${icon("timer_off")} Waktu pembayaran habis</h3><p class="muted">Slot dilepas. Kalau kamu <b>sudah terlanjur transfer</b>, segera hubungi admin dengan kode ${esc(b.kode)}.</p></div>`;
-    else if (eff === "KEDALUWARSA") body += `<div class="panel"><h3>${icon("timer_off")} Permintaan kedaluwarsa</h3><p class="muted">Admin belum sempat memproses sampai batas waktu. Kamu bisa mengajukan lagi.</p><a class="btn btn-save" href="#/new">Booking baru</a></div>`;
+    else if (eff === "KEDALUWARSA") body += `<div class="panel"><h3>${icon("timer_off")} Permintaan kedaluwarsa</h3><p class="muted">Admin belum sempat memproses sampai batas waktu. Kamu bisa mengajukan lagi.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
     if (eff === "MENUNGGU_VERIFIKASI") body += `<div class="panel"><h3>${icon("fact_check")} Pembayaran sedang diverifikasi</h3><p class="muted">Terima kasih! Admin sedang mencocokkan pembayaranmu. Tidak perlu bayar lagi.</p></div>`;
     if (eff === "TERKONFIRMASI" || eff === "CHECKED_IN") {
         body += `<div class="panel ok"><h3>${icon(eff === "CHECKED_IN" ? "sports_esports" : "verified")} ${eff === "CHECKED_IN" ? "Selamat bermain!" : "Booking terkonfirmasi"}</h3>`;
         if (eff === "TERKONFIRMASI") body += `<p class="muted">Tunjukkan QR ini ke admin saat datang. Datang paling lambat ${ST.noShowGraceMin} menit setelah jam mulai.</p><div class="qr-box">${qrSvg(b.kode)}</div><div class="big-code">${esc(b.kode)}</div>`;
-        else body += `<p class="muted">Sesi berjalan sampai ${esc(witaTime(b.endMs))}.</p>`;
+        else body += `<p class="muted center">Sesi berjalan sampai ${esc(witaTime(b.endMs))}.</p>`;
         body += `</div>`;
     }
-    if (eff === "SELESAI") body += `<div class="panel"><h3>${icon("celebration")} Terima kasih sudah main!</h3><p class="muted">Sampai ketemu lagi di ARAYA GAMESTATION.</p><a class="btn btn-save" href="#/new">Booking lagi</a></div>`;
+    if (eff === "SELESAI") body += `<div class="panel center"><h3>${icon("celebration")} Terima kasih sudah main!</h3><p class="muted">Sampai ketemu lagi di ARAYA GAMESTATION.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
     if (eff === "DITOLAK") {
         body += `<div class="panel bad"><h3>${icon("cancel")} Belum bisa diproses</h3><p>${esc(b.rejectReason || "Jadwal tidak tersedia.")}</p>
-        <button class="btn btn-save" id="retryBtn">Sesuaikan & Ajukan Ulang</button></div>`;
+        <button class="btn btn-save btn-block" id="retryBtn">${icon("refresh")} Sesuaikan & Ajukan Ulang</button></div>`;
     }
     if (eff === "DIBATALKAN") body += `<div class="panel"><h3>${icon("block")} Booking dibatalkan</h3></div>`;
     if (eff === "NO_SHOW") body += `<div class="panel bad"><h3>${icon("person_off")} Tidak datang</h3><p class="muted">${esc(ST.policy)}</p></div>`;
@@ -331,7 +338,7 @@ function renderDetail(secret, b, fresh, ui) {
     const money = b.total ? `<div class="kv"><span>Total</span><b>${rupiah(b.total)}</b></div><div class="kv"><span>DP${b.dpMethod === "CASH" ? " (tunai)" : ""}</span><b>${rupiah(b.dpDue)}</b></div>${b.dpPaid ? `<div class="kv"><span>DP diterima</span><b class="okc">${rupiah(b.dpPaid)}</b></div>` : ""}` : b.estTotal ? `<div class="kv"><span>Estimasi total</span><b>${rupiah(b.estTotal)}</b></div>` : "";
     const canCancel = ["PENDING", "MENUNGGU_BAYAR"].includes(eff);
 
-    view.innerHTML = `<div class="detail-head"><a href="#/" class="muted">‹ Beranda</a>${pill(eff)}</div>
+    view.innerHTML = `<div class="detail-head"><a href="#/" class="btn btn-ghost btn-sm">${icon("arrow_back", 16)} Beranda</a>${pill(eff)}</div>
     ${stepsHtml}${body}
     <div class="panel"><h3>${icon("receipt_long")} Detail</h3>
       <div class="kv"><span>Kode booking</span><b class="mono">${esc(b.kode)}</b></div>

@@ -390,7 +390,6 @@ async function verifyModal(b) {
     const m = modal(`<h3>${icon("fact_check")} Verifikasi pembayaran</h3>
       <div class="banner ok" style="flex-direction:column;gap:4px"><span>Cari di mutasi / notifikasi merchant QRIS:</span><b style="font-size:24px;font-family:Orbitron">${rupiah(b.payAmount)}</b><span class="muted">Nominal harus PERSIS sama. Dilaporkan ${b.paidReportedAt ? esc(fmtDT(b.paidReportedAt)) : "-"}${b.sender ? " · pengirim: " + esc(b.sender) : ""}</span></div>
       ${img ? `<img class="proof-img" src="${img}" alt="bukti">` : `<p class="muted center">Tidak ada screenshot terlampir. Cocokkan langsung di mutasi.</p>`}
-      <p class="muted">Screenshot bisa dipalsukan. Keputusan berdasarkan mutasi, bukan gambar.</p>
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Tutup</button><button class="btn btn-delete" id="vNo">Belum masuk</button><button class="btn btn-ok" id="vOk">${icon("check", 16)} Sudah masuk</button></div>`);
     $("#vOk", m.el).onclick = async () => {
         const patch = { status: "TERKONFIRMASI", dpPaid: b.payAmount, dpPaidMethod: "QRIS", dpPaidAt: now(), verifiedAt: now() };
