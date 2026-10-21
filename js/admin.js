@@ -3,7 +3,7 @@ import {
     GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, writeBatch
 } from "./fb.js";
 import {
-    $, $$, esc, toast, modal, confirmBox, setBusy, copyText, icon, rupiah, fmtNum, parseNum, normWA, randSecret, genKode, lookupId, normKode,
+    $, $$, esc, toast, modal, confirmBox, promptBox, setBusy, copyText, icon, rupiah, fmtNum, parseNum, normWA, randSecret, genKode, lookupId, normKode,
     witaDate, witaTime, witaDateTimeInput, fromDateTimeInput, addDays, fmtDate, fmtDT, tsMs, now, syncClock, STATUS, HOLDING, pill, effStatus,
     mergeSettings, roomCfg, calcPrice, fillTpl, waLink, bookingLink, siteLink, startBackground
 } from "./lib.js";
@@ -397,7 +397,7 @@ async function verifyModal(b) {
         if (await run(async () => { await changeStatus(b, patch, { add: addOf(b, "TERKONFIRMASI") }); try { await deleteDoc(doc(db, "proofs", b.id)); } catch (e) { } }, "Pembayaran dikonfirmasi")) { m.close(); waPrompt({ ...b, ...patch }, "confirmed", "Kabari pelanggan"); }
     };
     $("#vNo", m.el).onclick = async () => {
-        const note = prompt("Catatan untuk pelanggan (mis. 'Nominal belum masuk, cek lagi')", "Pembayaran belum kami temukan. Cek kembali nominal & coba lagi."); if (note === null) return;
+        const note = await promptBox("Catatan untuk pelanggan", "Pesan ini tampil di halaman pelanggan.", "Pembayaran belum kami temukan. Cek kembali nominal & coba lagi.", "Kembalikan"); if (note === null) return;
         const dl = now() + 15 * 60000, patch = { status: "MENUNGGU_BAYAR", payDeadline: dl, payNote: note };
         if (await run(async () => { await changeStatus(b, patch, { add: addOf(b, "MENUNGGU_BAYAR", dl) }); try { await deleteDoc(doc(db, "proofs", b.id)); } catch (e) { } }, "Dikembalikan ke menunggu bayar (+15 menit)")) m.close();
     };

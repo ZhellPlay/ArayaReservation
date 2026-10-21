@@ -168,7 +168,25 @@ export function setBusy(btn, on, text) {
     else { btn.disabled = false; btn.classList.remove("btn-loading"); if (btn.dataset.o) btn.innerHTML = btn.dataset.o; }
 }
 
-export async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("Disalin", "success"); } catch (e) { prompt("Salin manual:", t); } }
+export async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("Disalin", "success"); } catch (e) { copyBox(t); } }
+
+function copyBox(t) {
+    const m = modal(`<div class="modal-icon"><span class="material-icons-round">content_copy</span></div><h3>Salin manual</h3><p>Salin otomatis diblokir browser. Tekan lama teks di bawah lalu pilih salin.</p>
+    <div class="form-group"><input id="cpIn" readonly value="${esc(t)}"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" data-close>Tutup</button></div>`, { wide: false });
+    const inp = $("#cpIn", m.el); inp.focus(); inp.select();
+}
+
+export function promptBox(title, msg, value = "", ok = "Kirim") {
+    return new Promise(res => {
+        const m = modal(`<div class="modal-icon"><span class="material-icons-round">edit_note</span></div><h3>${esc(title)}</h3><p>${esc(msg)}</p>
+        <div class="form-group"><textarea id="pbIn" rows="3" maxlength="200">${esc(value)}</textarea></div>
+        <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-save" id="pbOk" style="flex:0 0 auto;padding:12px 22px">${esc(ok)}</button></div>`, { sticky: true, wide: false });
+        const inp = $("#pbIn", m.el); inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
+        $$("[data-close]", m.el).forEach(b => b.addEventListener("click", () => res(null)));
+        $("#pbOk", m.el).addEventListener("click", () => { const v = inp.value.trim(); m.close(); res(v); });
+    });
+}
 export const icon = (n, size = 18) => `<span class="material-icons-round" style="font-size:${size}px">${n}</span>`;
 
 export function qrSvg(text) {

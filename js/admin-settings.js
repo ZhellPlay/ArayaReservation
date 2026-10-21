@@ -1,5 +1,5 @@
 import { db, doc, setDoc } from "./fb.js";
-import { $, $$, esc, fmtNum, parseNum, normWA, icon, compressImage, qrSvg, toast, DEFAULT_SETTINGS, modal, now } from "./lib.js";
+import { $, $$, esc, fmtNum, parseNum, normWA, icon, compressImage, qrSvg, toast, DEFAULT_SETTINGS, modal, confirmBox, now } from "./lib.js";
 import { validateQris, decodeQrFromFile, makeDynamic } from "./qris.js";
 
 const roomRow = r => `<tr data-row data-orig="${esc(r.name)}">
@@ -14,7 +14,7 @@ const roomRow = r => `<tr data-row data-orig="${esc(r.name)}">
 </tr>`;
 
 const lokBlock = (l, rms) => `<div class="lok-block" data-loksec="${esc(l)}">
-    <div class="lok-title">${icon("store", 20)}<input data-lokname value="${esc(l)}" maxlength="30" placeholder="Nama cabang" aria-label="Nama cabang"></div>
+    <input class="lok-name" data-lokname value="${esc(l)}" maxlength="30" placeholder="Nama cabang" aria-label="Nama cabang">
     <h4 class="subsec-title">Room &amp; Tarif</h4>
     <div class="scroll-x"><table class="tbl" data-lok="${esc(l)}">
         <thead><tr><th>Room</th><th>Tarif/jam</th><th>Min jam</th><th>Kapasitas</th><th>Maks</th><th>+Orang/jam</th><th>Aktif</th><th></th></tr></thead>
@@ -182,7 +182,7 @@ export function renderSettings(el, S, H) {
 
     drawQ(); drawHol();
 
-    el.onclick = e => {
+    el.onclick = async e => {
         const delrow = e.target.closest("[data-delrow]");
         if (delrow) { delrow.closest("tr").remove(); S.dirty = true; return; }
         const addroom = e.target.closest("[data-addroom]");
@@ -197,7 +197,7 @@ export function renderSettings(el, S, H) {
             const l = removelok.dataset.removelok;
             if ($$("[data-loksec]", el).length <= 1) return toast("Minimal 1 cabang", "error");
             const cur = $("[data-lokname]", removelok.closest("[data-loksec]")).value.trim() || l;
-            if (!confirm(`Hapus cabang "${cur}"?`)) return;
+            if (!await confirmBox("Hapus cabang", `Cabang "${cur}" dan semua room-nya akan dihapus setelah Anda menekan Simpan.`, "Hapus", true)) return;
             removelok.closest("[data-loksec]").remove();
             S.dirty = true;
             return;
@@ -206,7 +206,9 @@ export function renderSettings(el, S, H) {
         if (qdel) {
             (async () => {
                 const l = qdel.dataset.qdel;
-                if (!S.qris[l] || !confirm("Hapus QRIS " + l + "?")) return;
+                if (!S.qris[l]) return;
+                const cur = $("[data-lokname]", qdel.closest("[data-loksec]")).value.trim() || l;
+                if (!await confirmBox("Hapus QRIS", `QRIS cabang ${cur} akan dihapus.`, "Hapus", true)) return;
                 delete S.qris[l];
                 try { await setDoc(doc(db, "config", "qris"), S.qris); drawQ(); }
                 catch (err) { toast("Gagal hapus: " + (err.code || err.message), "error"); }

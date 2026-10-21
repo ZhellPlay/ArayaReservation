@@ -1,6 +1,6 @@
 import { db, doc, getDoc, onSnapshot, writeBatch, serverTimestamp } from "./fb.js";
 import {
-    $, $$, esc, toast, setBusy, copyText, icon, rupiah, normWA, validWA, randSecret, genKode, normKode, lookupId,
+    $, $$, esc, toast, confirmBox, setBusy, copyText, icon, rupiah, normWA, validWA, randSecret, genKode, normKode, lookupId,
     toMs, witaDate, witaTime, fmtDate, fmtDT, fmtCountdown, now, syncClock, pill, effStatus, mergeSettings, roomCfg,
     isHoliday, calcPrice, waLink, bookingLink, qrSvg, compressImage, downloadQrPng, startBackground
 } from "./lib.js";
@@ -368,7 +368,8 @@ function renderDetail(secret, b, fresh, ui) {
         catch (e) { toast("Gagal mengunduh QR", "error"); }
     });
     $("#cancelBtn")?.addEventListener("click", async () => {
-        if (!confirm(b.status === "MENUNGGU_BAYAR" ? "Batalkan booking ini? Jika sudah transfer, hubungi admin dulu." : "Batalkan permintaan booking ini?")) return;
+        const msg = b.status === "MENUNGGU_BAYAR" ? "Jika sudah transfer, hubungi admin dulu sebelum membatalkan." : "Permintaan booking ini akan dibatalkan.";
+        if (!await confirmBox("Batalkan booking?", msg, "Ya, batalkan", true)) return;
         try { await writeUser(secret, { status: "DIBATALKAN", cancelBy: "USER" }); toast("Booking dibatalkan", "success"); } catch (e) { toast("Gagal membatalkan", "error"); }
     });
 
@@ -381,7 +382,7 @@ function renderDetail(secret, b, fresh, ui) {
     $("#paidBtn")?.addEventListener("click", async e => {
         const btn = e.currentTarget;
         if (!ui.proof) return toast("Wajib melampirkan bukti pembayaran (screenshot)!", "error");
-        if (!confirm("Pastikan transfer sudah berhasil. Lanjut kirim konfirmasi?")) return;
+        if (!await confirmBox("Kirim konfirmasi bayar?", "Pastikan transfer sudah berhasil sebelum melanjutkan.", "Kirim")) return;
         setBusy(btn, true, "Mengirim…");
         try {
             const batch = writeBatch(db);
