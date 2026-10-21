@@ -1,4 +1,3 @@
-// QRIS: baca QRIS statis, ubah jadi dinamis (nominal terkunci), hitung CRC16
 export function crc16(str) {
     let crc = 0xFFFF;
     for (let i = 0; i < str.length; i++) {
@@ -24,7 +23,6 @@ export function validateQris(p) {
     const tags = Object.fromEntries(parseTLV(p));
     return { merchant: tags["59"] || "", city: tags["60"] || "", isDynamic: tags["01"] === "12" };
 }
-// QRIS statis -> dinamis dengan nominal. Dipasang di aplikasi e-wallet, nominal ikut terkunci.
 export function makeDynamic(staticPayload, amount) {
     amount = Math.round(Number(amount));
     if (!(amount > 0)) throw new Error("Nominal tidak valid");
@@ -36,7 +34,6 @@ export function makeDynamic(staticPayload, amount) {
     const body = build(list) + "6304";
     return body + crc16(body);
 }
-// baca QR dari file foto (butuh jsQR global)
 export async function decodeQrFromFile(file) {
     const bmp = await createImageBitmap(file);
     for (const maxSide of [1200, 800, 1600, 500]) {

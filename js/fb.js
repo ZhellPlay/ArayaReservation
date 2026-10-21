@@ -1,4 +1,3 @@
-// Satu pintu import Firebase. Ganti config di sini saja.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";

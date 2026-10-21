@@ -1,5 +1,3 @@
-// Ketersediaan room. 1 dokumen per room per hari: availability/{LOKASI__ROOM__YYYY-MM-DD}
-// { ranges: [{s,e,k,bid,until?}] }  s,e = epoch ms.  k: hold | booked | walkin | block
 import { db, doc, getDoc, runTransaction, serverTimestamp } from "./fb.js";
 import { witaDate, now } from "./lib.js";
 
@@ -13,7 +11,6 @@ export function datesTouched(s, e, buf = 0) {
     return out;
 }
 export const overlaps = (s, e, r, buf = 0) => s < r.e + buf && e > r.s - buf;
-// hold yang sudah lewat 'until' dianggap kosong, kecuali pemiliknya masih hidup (mis. sudah lapor bayar)
 export const occupied = (r, t = now(), alive) => r.k !== "hold" || (r.until || 0) > t || (alive ? !!alive(r.bid) : false);
 
 const cache = new Map();
@@ -37,11 +34,8 @@ export async function checkFree(lok, room, s, e, bufMs, fresh) {
     return conflictsIn(all, s, e, bufMs).length === 0;
 }
 
-/* ===== sisi admin: semua perubahan lewat transaksi ===== */
-// remove: [{lokasi,room,s,e,bid}]   add: {lokasi,room,s,e,bid,k,until?} | null
-// bookingRef/bookingData: ikut ditulis dalam transaksi yang sama (atomik)
 export async function applyTx({ remove = [], add = null, bufMs = 0, alive, bookingRef = null, bookingData = null, bookingCreate = false, force = false }) {
-    const refs = new Map(); // id -> {lok,room,date}
+    const refs = new Map();
     const need = (lok, room, s, e, buf) => datesTouched(s, e, buf).forEach(d => refs.set(availId(lok, room, d), { lok, room, date: d }));
     remove.forEach(r => need(r.lokasi, r.room, r.s, r.e, 0));
     if (add) need(add.lokasi, add.room, add.s, add.e, bufMs);

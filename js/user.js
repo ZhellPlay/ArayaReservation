@@ -1,7 +1,7 @@
 import { db, doc, getDoc, onSnapshot, writeBatch, serverTimestamp } from "./fb.js";
 import {
-    $, $$, esc, toast, setBusy, copyText, icon, rupiah, parseNum, normWA, validWA, randSecret, genKode, normKode, lookupId,
-    toMs, witaDate, witaTime, fmtDate, fmtDT, fmtCountdown, tsMs, now, syncClock, STATUS, pill, effStatus, mergeSettings, roomCfg,
+    $, $$, esc, toast, setBusy, copyText, icon, rupiah, normWA, validWA, randSecret, genKode, normKode, lookupId,
+    toMs, witaDate, witaTime, fmtDate, fmtDT, fmtCountdown, now, syncClock, pill, effStatus, mergeSettings, roomCfg,
     isHoliday, calcPrice, waLink, bookingLink, qrSvg, compressImage, downloadQrPng, startBackground
 } from "./lib.js";
 import { rangesForDay, conflictsIn, checkFree } from "./avail.js";
@@ -12,7 +12,9 @@ let ST = mergeSettings(null), QRC = {}, unsub = null, ticker = null, lastStatus 
 
 const mine = () => { try { return JSON.parse(localStorage.getItem("araya_mine") || "[]"); } catch (e) { return []; } };
 const setMine = a => { try { localStorage.setItem("araya_mine", JSON.stringify(a.slice(0, 30))); } catch (e) { } };
-const remember = it => setMine([it, ...mine().filter(x => x.s !== it.s)]);
+const remember = it => setMine([{ ...mine().find(x => x.s === it.s), ...it }, ...mine().filter(x => x.s !== it.s)]);
+const patchMine = (s, patch) => setMine(mine().map(x => x.s === s ? { ...x, ...patch } : x));
+const TERMINAL = ["SELESAI", "DITOLAK", "KEDALUWARSA", "DIBATALKAN", "NO_SHOW"];
 const forget = s => setMine(mine().filter(x => x.s !== s));
 const recentSubmits = () => { try { return JSON.parse(localStorage.getItem("araya_sub") || "[]").filter(t => Date.now() - t < H); } catch (e) { return []; } };
 
@@ -56,13 +58,18 @@ async function viewHome() {
     const box = $("#myList");
     list.forEach((it, i) => {
         const card = document.createElement("div"); card.className = "booking-card"; card.style.animationDelay = i * .05 + "s";
-        card.innerHTML = cardInner(it, null); box.appendChild(card);
-        card.addEventListener("click", e => { if (e.target.closest("[data-forget]")) return; location.hash = "#/b/" + it.s; });
+        card.innerHTML = cardInner(it, it.st || null); box.appendChild(card);
+        card.addEventListener("click", e => {
+            if (e.target.closest("[data-forget]")) { forget(it.s); card.remove(); return; }
+            location.hash = "#/b/" + it.s;
+        });
+        if (TERMINAL.includes(it.st)) return;
         getDoc(doc(db, "bookings", it.s)).then(s => {
             if (!s.exists()) { card.innerHTML = cardInner(it, "HILANG"); return; }
-            card.innerHTML = cardInner({ ...it, ...s.data(), s: it.s }, effStatus(s.data(), ST));
+            const d = s.data();
+            patchMine(it.s, { st: d.status });
+            card.innerHTML = cardInner({ ...it, ...d, s: it.s }, effStatus(d, ST));
         }).catch(() => { });
-        card.addEventListener("click", e => { const f = e.target.closest("[data-forget]"); if (f) { forget(it.s); card.remove(); } });
     });
 }
 
@@ -86,16 +93,16 @@ function viewFind() {
     <div class="form-actions"><button class="btn btn-save" id="q-go">${icon("search")} Cari</button></div>
     <p class="muted center" style="margin-top:16px"><a href="#/">‹ Kembali</a></p></div>`;
     $("#q-go").onclick = async e => {
-        const kode = normKode($("#q-kode").value), wa = normWA($("#q-wa").value);
+        const btn = e.currentTarget, kode = normKode($("#q-kode").value), wa = normWA($("#q-wa").value);
         if (!kode || !validWA(wa)) return toast("Cek lagi kode dan nomor WA-nya", "error");
-        setBusy(e.currentTarget, true, "Mencari…");
+        setBusy(btn, true, "Mencari…");
         try {
             const s = await getDoc(doc(db, "lookups", await lookupId(kode, wa)));
             if (!s.exists()) throw 0;
             const sec = s.data().s; const b = await getDoc(doc(db, "bookings", sec)); if (!b.exists()) throw 0;
-            const d = b.data(); remember({ s: sec, kode: d.kode, nama: d.nama, lokasi: d.lokasi, room: d.room, tanggal: d.tanggal, jam: d.jamMulai, at: Date.now() });
+            const d = b.data(); remember({ s: sec, kode: d.kode, nama: d.nama, lokasi: d.lokasi, room: d.room, tanggal: d.tanggal, jam: d.jamMulai, st: d.status, at: Date.now() });
             location.hash = "#/b/" + sec;
-        } catch (err) { toast("Tidak ditemukan. Pastikan kode dan nomor WA sama dengan saat booking.", "error"); setBusy(e.currentTarget, false); }
+        } catch (err) { toast("Tidak ditemukan. Pastikan kode dan nomor WA sama dengan saat booking.", "error"); setBusy(btn, false); }
     };
 }
 
@@ -138,6 +145,9 @@ function viewForm() {
         $("#f-room").innerHTML = l ? `<option value="">Pilih Room</option>` + rs.map(r => `<option>${esc(r.name)}</option>`).join("") : `<option value="">Pilih lokasi dulu</option>`;
     };
     const info = () => {
+        const oi = $("#f-orang"), cap = roomCfg(ST, $("#f-lokasi").value, $("#f-room").value);
+        oi.max = (cap && cap.maxCap) || 50;
+        if (+oi.value > +oi.max) oi.value = oi.max;
         const v = rd(), r = roomCfg(ST, v.lokasi, v.room);
         $("#f-roomhint").textContent = r ? `Kapasitas ${r.baseCap} orang${r.maxCap ? `, maksimal ${r.maxCap}` : ""}. Lebih dari kapasitas dikenakan biaya tambahan per orang.` : "";
         const oh = $("#f-orangHint");
@@ -179,12 +189,12 @@ function viewForm() {
     $("#f-lokasi").onchange = () => { fillRooms(); jam = null; all(); };
     ["f-room", "f-tanggal"].forEach(id => $("#" + id).addEventListener("change", () => { jam = null; all(); }));
     $$(".stepper", view).forEach(st => {
-        const inp = $("input", st), mn = +inp.min, mx = +inp.max;
-        $$(".stepper-btn", st).forEach(b => b.onclick = () => { inp.value = Math.min(mx, Math.max(mn, (parseInt(inp.value) || mn) + (+b.dataset.d))); if (inp.id === "f-durasi") jam = null; inp.id === "f-durasi" ? all() : info(); });
-        inp.onchange = () => { inp.value = Math.min(mx, Math.max(mn, parseInt(inp.value) || mn)); if (inp.id === "f-durasi") { jam = null; all(); } else info(); };
+        const inp = $("input", st), clamp = v => Math.min(+inp.max, Math.max(+inp.min, v));
+        $$(".stepper-btn", st).forEach(b => b.onclick = () => { inp.value = clamp((parseInt(inp.value) || +inp.min) + (+b.dataset.d)); if (inp.id === "f-durasi") jam = null; inp.id === "f-durasi" ? all() : info(); });
+        inp.onchange = () => { inp.value = clamp(parseInt(inp.value) || +inp.min); if (inp.id === "f-durasi") { jam = null; all(); } else info(); };
     });
     $("#f-slots").addEventListener("click", e => { const c = e.target.closest(".chip"); if (!c || c.disabled) return; jam = c.dataset.t; $$(".chip", $("#f-slots")).forEach(x => x.classList.toggle("on", x === c)); });
-    
+
     info();
 
     if (retry) {
@@ -221,7 +231,7 @@ function viewForm() {
             batch.set(doc(db, "bookings", secret), data);
             batch.set(doc(db, "lookups", await lookupId(kode, wa)), { s: secret });
             await batch.commit();
-            remember({ s: secret, kode, nama: v.nama, lokasi: v.lokasi, room: v.room, tanggal: v.tanggal, jam: v.jam, at: Date.now() });
+            remember({ s: secret, kode, nama: v.nama, lokasi: v.lokasi, room: v.room, tanggal: v.tanggal, jam: v.jam, st: "PENDING", at: Date.now() });
             try { localStorage.setItem("araya_sub", JSON.stringify([...recentSubmits(), Date.now()])); } catch (x) { }
             sessionStorage.setItem("araya_new", secret);
             location.hash = "#/b/" + secret;
@@ -238,21 +248,23 @@ function stepper(id, mn, mx, val) {
 function viewDetail(secret) {
     view.innerHTML = `<div class="panel center muted">Memuat booking…</div>`;
     let last = null, fresh = sessionStorage.getItem("araya_new") === secret;
-    const draw = () => { if (last) renderDetail(secret, last, fresh); };
-    
+    const ui = { proof: null, sender: "" };
+    lastStatus = null;
+    const draw = () => { if (last) renderDetail(secret, last, fresh, ui); };
+
     unsub = onSnapshot(doc(db, "bookings", secret), s => {
         if (!s.exists()) { view.innerHTML = `<div class="panel center"><span class="material-icons-round big">link_off</span><h3>Booking tidak ditemukan</h3><p class="muted">Link salah, atau booking sudah dihapus admin.</p><p><a class="btn btn-ghost" href="#/find">Cari pakai kode</a> <a class="btn btn-ghost" href="#/">Beranda</a></p></div>`; forget(secret); return; }
         const d = s.data();
-        
+
         if (lastStatus && lastStatus !== d.status && ["MENUNGGU_BAYAR", "TERKONFIRMASI", "DITOLAK", "MENUNGGU_VERIFIKASI"].includes(d.status)) {
             beepUser();
         }
         lastStatus = d.status;
-        
-        last = d; remember({ s: secret, kode: last.kode, nama: last.nama, lokasi: last.lokasi, room: last.room, tanggal: last.tanggal, jam: last.jamMulai, at: Date.now() });
+
+        last = d; remember({ s: secret, kode: last.kode, nama: last.nama, lokasi: last.lokasi, room: last.room, tanggal: last.tanggal, jam: last.jamMulai, st: last.status, at: Date.now() });
         draw();
     }, err => { view.innerHTML = `<div class="panel center"><h3>Gagal memuat</h3><p class="muted">Cek koneksi internet kamu lalu muat ulang.</p></div>`; });
-    
+
     ticker = setInterval(() => {
         if (!last) return; let expire = false;
         $$("[data-cd]").forEach(el => { const left = +el.dataset.cd - now(); el.textContent = fmtCountdown(left); if (left <= 0) expire = true; });
@@ -260,7 +272,7 @@ function viewDetail(secret) {
     }, 1000);
 }
 
-function renderDetail(secret, b, fresh) {
+function renderDetail(secret, b, fresh, ui) {
     const eff = effStatus(b, ST), link = bookingLink(secret), r = roomCfg(ST, b.lokasi, b.room);
     const extra = r ? Math.max(0, b.orang - r.baseCap) : 0;
     const stage = { PENDING: 0, MENUNGGU_BAYAR: 1, MENUNGGU_VERIFIKASI: 2, TERKONFIRMASI: 3, CHECKED_IN: 3, SELESAI: 3 }[eff];
@@ -314,7 +326,7 @@ function renderDetail(secret, b, fresh) {
 
     const money = b.total ? `<div class="kv"><span>Total</span><b>${rupiah(b.total)}</b></div><div class="kv"><span>DP${b.dpMethod === "CASH" ? " (tunai)" : ""}</span><b>${rupiah(b.dpDue)}</b></div>${b.dpPaid ? `<div class="kv"><span>DP diterima</span><b class="okc">${rupiah(b.dpPaid)}</b></div>` : ""}` : b.estTotal ? `<div class="kv"><span>Estimasi total</span><b>${rupiah(b.estTotal)}</b></div>` : "";
     const canCancel = ["PENDING", "MENUNGGU_BAYAR"].includes(eff);
-    
+
     view.innerHTML = `<div class="detail-head"><a href="#/" class="muted">‹ Beranda</a>${pill(eff)}</div>
     ${stepsHtml}${body}
     <div class="panel"><h3>${icon("receipt_long")} Detail</h3>
@@ -332,7 +344,7 @@ function renderDetail(secret, b, fresh) {
     </div>
     ${canCancel ? `<button class="btn btn-delete btn-block" id="cancelBtn">${icon("close", 16)} Batalkan booking</button>` : ""}
     <p class="muted center" style="margin-top:14px">${esc(ST.policy)}</p>`;
-    
+
     if (fresh) sessionStorage.removeItem("araya_new");
 
     $("#retryBtn")?.addEventListener("click", () => {
@@ -355,21 +367,22 @@ function renderDetail(secret, b, fresh) {
         if (!confirm(b.status === "MENUNGGU_BAYAR" ? "Batalkan booking ini? Jika sudah transfer, hubungi admin dulu." : "Batalkan permintaan booking ini?")) return;
         try { await writeUser(secret, { status: "DIBATALKAN", cancelBy: "USER" }); toast("Booking dibatalkan", "success"); } catch (e) { toast("Gagal membatalkan", "error"); }
     });
-    
-    let proof = null;
+
+    if (ui.proof && $("#proofPrev")) { $("#proofPrev").src = ui.proof; $("#proofPrev").hidden = false; }
+    if ($("#sender")) { $("#sender").value = ui.sender; $("#sender").addEventListener("input", e => { ui.sender = e.target.value; }); }
     $("#proofFile")?.addEventListener("change", async e => {
         const f = e.target.files[0]; if (!f) return;
-        try { proof = await compressImage(f); const im = $("#proofPrev"); im.src = proof; im.hidden = false; } catch (x) { toast("Gambar tidak bisa dibaca", "error"); }
+        try { ui.proof = await compressImage(f); const im = $("#proofPrev"); im.src = ui.proof; im.hidden = false; } catch (x) { toast("Gambar tidak bisa dibaca", "error"); }
     });
     $("#paidBtn")?.addEventListener("click", async e => {
-        const btn = e.currentTarget; 
-        if (!proof) return toast("Wajib melampirkan bukti pembayaran (screenshot)!", "error");
+        const btn = e.currentTarget;
+        if (!ui.proof) return toast("Wajib melampirkan bukti pembayaran (screenshot)!", "error");
         if (!confirm("Pastikan transfer sudah berhasil. Lanjut kirim konfirmasi?")) return;
         setBusy(btn, true, "Mengirim…");
         try {
             const batch = writeBatch(db);
             batch.update(doc(db, "bookings", secret), { status: "MENUNGGU_VERIFIKASI", paidReportedAt: now(), sender: ($("#sender").value || "").slice(0, 40), upd: serverTimestamp() });
-            if (proof) batch.set(doc(db, "proofs", secret), { img: proof, at: now() });
+            batch.set(doc(db, "proofs", secret), { img: ui.proof, at: now() });
             await batch.commit(); toast("Terkirim! Admin akan memverifikasi.", "success");
         } catch (x) { console.error(x); toast("Gagal mengirim. Mungkin batas waktu sudah lewat, hubungi admin.", "error"); setBusy(btn, false); }
     });

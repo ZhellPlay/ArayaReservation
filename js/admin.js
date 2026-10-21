@@ -4,15 +4,15 @@ import {
 } from "./fb.js";
 import {
     $, $$, esc, toast, modal, confirmBox, setBusy, copyText, icon, rupiah, parseNum, normWA, randSecret, genKode, lookupId, normKode,
-    toMs, witaDate, witaTime, witaDateTimeInput, fromDateTimeInput, addDays, fmtDate, fmtDT, tsMs, now, syncClock, STATUS, HOLDING, pill, effStatus,
-    mergeSettings, roomCfg, calcPrice, fillTpl, waLink, bookingLink, siteLink, startBackground, isHoliday
+    witaDate, witaTime, witaDateTimeInput, fromDateTimeInput, addDays, fmtDate, fmtDT, tsMs, now, syncClock, STATUS, HOLDING, pill, effStatus,
+    mergeSettings, roomCfg, calcPrice, fillTpl, waLink, bookingLink, siteLink, startBackground
 } from "./lib.js";
 import { applyTx } from "./avail.js";
 import { renderSettings } from "./admin-settings.js";
 
 const H = 3600000, root = $("#root");
 export const S = { st: mergeSettings(null), qris: {}, bookings: [], byBid: new Map(), tab: "inbox", f: { lokasi: "ALL", status: "AKTIF", day: "ALL", sort: "main", q: "" }, hist: 3, dirty: false, pendingTab: null };
-let unsubB = null, firstSnap = true, scanStream = null;
+let unsubB = null, firstSnap = true, scanStream = null, sweepTimer = null;
 
 const bufMs = () => (S.st.bufferMin || 0) * 60000;
 const eff = b => effStatus(b, S.st);
@@ -64,13 +64,17 @@ onAuthStateChanged(auth, async user => {
     startApp(user);
 });
 
-function stopApp() { if (unsubB) unsubB(); unsubB = null; stopScan(); }
+function stopApp() { if (unsubB) unsubB(); unsubB = null; clearInterval(sweepTimer); sweepTimer = null; stopScan(); }
+
+let bgStarted = false;
 
 async function startApp(user) {
-    startBackground(); syncClock();
+    stopApp();
+    if (!bgStarted) { startBackground(); bgStarted = true; }
+    syncClock();
     try { const s = await getDoc(doc(db, "config", "settings")); if (s.exists()) S.st = mergeSettings(s.data()); else S.needSeed = true; } catch (e) { }
     try { const s = await getDoc(doc(db, "config", "qris")); if (s.exists()) S.qris = s.data(); } catch (e) { }
-    
+
     root.innerHTML = `<div class="admin-bar">
       <div class="admin-user">
         <span class="material-icons-round">account_circle</span>
@@ -83,13 +87,13 @@ async function startApp(user) {
     </div>
       ${S.needSeed ? `<div class="banner warn">${icon("settings")}<span>Pengaturan belum disimpan. Buka tab <b>Pengaturan</b>, isi tarif &amp; QRIS, lalu Simpan.</span></div>` : ""}
       <div class="tabs" id="tabs"></div><div id="tools"></div><div id="body"></div>`;
-      
+
     $("#outBtn").onclick = () => signOut(auth);
     $("#addBtn").onclick = () => manualModal();
     $("#body").addEventListener("click", onBodyClick);
     setTab(S.needSeed ? "settings" : "inbox");
     subscribe();
-    setInterval(() => { if (!document.hidden) { sweep(); if (["inbox", "list"].includes(S.tab)) renderBody(); } }, 60000);
+    sweepTimer = setInterval(() => { if (!document.hidden) { sweep(); if (["inbox", "list"].includes(S.tab)) renderBody(); } }, 60000);
 }
 
 function subscribe() {
@@ -142,16 +146,16 @@ function setTab(t) {
     if (S.tab === "scan" && t !== "scan") stopScan();
     S.tab = t; renderTabs();
     const tools = $("#tools");
-    
+
     let extra = "";
     if (t === "list") {
         const hasFilter = S.f.status !== "AKTIF" || S.f.day !== "ALL" || S.f.sort !== "main" || S.f.lokasi !== "ALL";
         extra = `<input id="fQ" placeholder="Cari nama / WA / kode" value="${esc(S.f.q)}">
           <button class="btn btn-ghost ${hasFilter ? 'filter-active' : ''}" id="btnFilter" title="Filter & Urutkan">${icon("tune", 18)}</button>`;
     }
-    
+
     tools.innerHTML = t === "settings" || t === "scan" ? "" : `<div class="filters">${extra}</div>`;
-    
+
     $("#fQ")?.addEventListener("input", e => { S.f.q = e.target.value; renderBody(); });
     $("#btnFilter")?.addEventListener("click", filterModal);
 
@@ -250,22 +254,22 @@ function listHTML() {
         return true;
     });
     arr = arr.sort(f.sort === "masuk" ? (a, b) => tsMs(b.createdAt) - tsMs(a.createdAt) : (a, b) => a.startMs - b.startMs);
-    
+
     const info = `<div class="muted" style="margin-bottom:16px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         <span>${arr.length} booking</span>
         ${S.hist < 30 ? `<button class="btn btn-ghost btn-sm" data-act="hist" style="padding:4px 10px; min-height:0; height:auto; font-size:12px">Muat 30 hari</button>` : ""}
         ${q.length >= 3 ? `<button class="btn btn-ghost btn-sm" data-act="deepsearch" style="padding:4px 10px; min-height:0; height:auto; font-size:12px">Cari di riwayat</button>` : ""}
     </div>`;
-    
+
     const showGroups = S.f.lokasi === "ALL" && S.st.lokasi.length > 1;
     if (!showGroups) return info + gridOf(arr, "Tidak ada booking yang cocok.");
-    
+
     const groups = S.st.lokasi.map(l => {
         const items = arr.filter(b => b.lokasi === l);
         if (!items.length) return "";
         return `<div class="section-header" style="margin-top:24px"><div class="section-title">${icon("place", 22)} ${esc(l)}</div><span class="count-badge">${items.length}</span></div>${gridOf(items, "")}`;
     }).filter(Boolean).join("");
-    
+
     return info + (groups || `<div class="empty-state"><span class="material-icons-round">inbox</span><p>Tidak ada booking yang cocok.</p></div>`);
 }
 
@@ -341,7 +345,7 @@ function approveModal(b) {
     const rivals = clashes.filter(o => eff(o) === "PENDING");
     const cashDefault = !!b.cashDp, hold = S.st.holdMinutes || 30;
     const defDeadline = cashDefault ? Math.max(b.startMs, now() + 30 * 60000) : now() + hold * 60000;
-    
+
     const m = modal(`<h3>${icon("check_circle")} Setujui booking</h3>
       <p><b>${esc(b.nama)}</b> · ${esc(b.lokasi)} ${esc(b.room)}<br>${esc(fmtDate(b.tanggal))}, ${esc(rangeTxt(b))}</p>
       ${hard.length ? `<div class="banner warn">${icon("warning")}<span>Bentrok dengan: ${hard.map(o => esc(o.nama) + " " + rangeTxt(o)).join(", ")}. Sistem akan menolak.</span></div>` : ""}
@@ -355,17 +359,17 @@ function approveModal(b) {
       </div>
       <label class="check" style="margin-top:8px"><input type="checkbox" id="aChk"><span>Saya sudah memastikan room <b>kosong</b> di jam ini (termasuk walk-in yang sedang main).</span></label>
       <div class="modal-actions" style="margin-top:20px"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-ok" id="aGo">${icon("check", 16)} Setujui</button></div>`);
-    
+
     $("#aGo", m.el).onclick = async e => {
-        const method = cashDefault ? "CASH" : "QRIS", deadline = fromDateTimeInput($("#aDead", m.el).value);
+        const btn = e.currentTarget, method = cashDefault ? "CASH" : "QRIS", deadline = fromDateTimeInput($("#aDead", m.el).value);
         if (!$("#aChk", m.el).checked) return toast("Centang dulu: pastikan room kosong", "error");
         if (method === "QRIS" && p.dp <= 0) return toast("DP untuk QRIS harus diisi", "error");
         if (!deadline || deadline <= now()) return toast("Batas bayar harus di masa depan", "error");
         const payAmount = p.dp;
-        setBusy(e.currentTarget, true, "Memproses…");
+        setBusy(btn, true, "Memproses…");
         const add = addOf(b, "MENUNGGU_BAYAR", deadline), patch = { status: "MENUNGGU_BAYAR", total: p.total, dpDue: p.dp, dpMethod: method, payAmount, payDeadline: deadline, approvedAt: now(), payNote: "" };
         const ok = await run(() => changeStatus(b, patch, { add }), "Disetujui, slot ditahan");
-        if (ok) { m.close(); waPrompt({ ...b, ...patch }, method === "CASH" ? "approveCash" : "approve", "Kabari pelanggan"); } else setBusy(e.currentTarget, false);
+        if (ok) { m.close(); waPrompt({ ...b, ...patch }, method === "CASH" ? "approveCash" : "approve", "Kabari pelanggan"); } else setBusy(btn, false);
     };
 }
 
@@ -382,10 +386,10 @@ function rejectModal(b) {
 }
 
 async function verifyModal(b) {
-    let img = ""; try { const p = await getDoc(doc(db, "proofs", b.id)); if (p.exists()) img = p.data().img; } catch (e) { }
+    let img = ""; try { const p = await getDoc(doc(db, "proofs", b.id)); if (p.exists() && String(p.data().img).startsWith("data:image/")) img = p.data().img; } catch (e) { }
     const m = modal(`<h3>${icon("fact_check")} Verifikasi pembayaran</h3>
       <div class="banner ok" style="flex-direction:column;gap:4px"><span>Cari di mutasi / notifikasi merchant QRIS:</span><b style="font-size:24px;font-family:Orbitron">${rupiah(b.payAmount)}</b><span class="muted">Nominal harus PERSIS sama. Dilaporkan ${b.paidReportedAt ? esc(fmtDT(b.paidReportedAt)) : "-"}${b.sender ? " · pengirim: " + esc(b.sender) : ""}</span></div>
-      ${img ? `<img class="proof-img" src="${img}" alt="bukti">` : `<p class="muted center">Tidak ada screenshot (tidak wajib). Cukup cocokkan di mutasi.</p>`}
+      ${img ? `<img class="proof-img" src="${img}" alt="bukti">` : `<p class="muted center">Tidak ada screenshot terlampir. Cocokkan langsung di mutasi.</p>`}
       <p class="muted">Screenshot bisa dipalsukan. Keputusan berdasarkan mutasi, bukan gambar.</p>
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Tutup</button><button class="btn btn-delete" id="vNo">Belum masuk</button><button class="btn btn-ok" id="vOk">${icon("check", 16)} Sudah masuk</button></div>`);
     $("#vOk", m.el).onclick = async () => {
@@ -450,7 +454,7 @@ function editModal(b) {
       <div class="form-group full-width"><label>Catatan</label><textarea id="eCat" rows="2">${esc(b.catatan || "")}</textarea></div></div>
       ${isOpen(b.status) && b.slot ? `<p class="muted">Slot akan dipindahkan otomatis, dan dicek bentrok ulang.</p>` : ""}
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-save" id="eGo" style="flex:0 0 auto;padding:12px 22px">Simpan</button></div>`);
-    
+
     let m_tot = 0, m_dp = 0;
     const recalc = () => {
         const lok = $("#eLok", m.el).value, roomName = $("#eRoom", m.el).value;
@@ -470,34 +474,40 @@ function editModal(b) {
         }
     };
 
-    const fill = () => { 
-        $("#eRoom", m.el).innerHTML = roomsOf($("#eLok", m.el).value).map(n => `<option ${n === b.room ? "selected" : ""}>${esc(n)}</option>`).join(""); 
+    const fill = () => {
+        $("#eRoom", m.el).innerHTML = roomsOf($("#eLok", m.el).value).map(n => `<option ${n === b.room ? "selected" : ""}>${esc(n)}</option>`).join("");
         recalc();
     };
-    fill(); 
+    fill();
     $("#eLok", m.el).onchange = fill;
     ["eRoom", "eDur", "eOrg", "eMic"].forEach(id => $("#" + id, m.el).addEventListener("input", recalc));
-    
+
     $("#eGo", m.el).onclick = async () => {
         const s = fromDateTimeInput($("#eDt", m.el).value), dur = parseFloat($("#eDur", m.el).value);
         if (!s || !(dur > 0)) return toast("Waktu / durasi tidak valid", "error");
-        const e = s + Math.round(dur * H), patch = { 
-            nama: $("#eNama", m.el).value.trim() || b.nama, 
-            wa: normWA($("#eWa", m.el).value), 
-            lokasi: $("#eLok", m.el).value, 
-            room: $("#eRoom", m.el).value, 
-            tanggal: witaDate(s), 
-            jamMulai: witaTime(s), 
-            durasi: dur, 
-            startMs: s, 
-            endMs: e, 
-            orang: parseInt($("#eOrg", m.el).value) || 1, 
-            mic: parseInt($("#eMic", m.el).value) || 0, 
-            catatan: $("#eCat", m.el).value.trim(), 
-            total: m_tot,
-            dpDue: m_dp,
-            upd: serverTimestamp() 
+        const e = s + Math.round(dur * H), patch = {
+            nama: $("#eNama", m.el).value.trim() || b.nama,
+            wa: normWA($("#eWa", m.el).value),
+            lokasi: $("#eLok", m.el).value,
+            room: $("#eRoom", m.el).value,
+            tanggal: witaDate(s),
+            jamMulai: witaTime(s),
+            durasi: dur,
+            startMs: s,
+            endMs: e,
+            orang: parseInt($("#eOrg", m.el).value) || 1,
+            mic: parseInt($("#eMic", m.el).value) || 0,
+            catatan: $("#eCat", m.el).value.trim(),
+            upd: serverTimestamp()
         };
+        if (!b.tipe || b.tipe === "ONLINE") {
+            if (b.status === "PENDING") patch.estTotal = m_tot;
+            else {
+                patch.total = m_tot;
+                patch.dpDue = m_dp;
+                if (b.status === "MENUNGGU_BAYAR" && b.dpMethod === "QRIS" && m_dp > 0) patch.payAmount = m_dp;
+            }
+        }
         const nb = { ...b, ...patch };
         const ok = await run(async () => {
             if (b.slot && isOpen(b.status)) await applyTx({ remove: [rangeOf(b)], add: addOf(nb), bufMs: bufMs(), alive, bookingRef: refOf(b), bookingData: patch });
@@ -523,7 +533,7 @@ function manualModal(pre = {}) {
     const sync = () => { const t = $("#mTipe", m.el).value; $$("[data-m=u]", m.el).forEach(x => x.style.display = t === "BLOK" ? "none" : ""); $("#mNamaL", m.el).textContent = t === "BLOK" ? "Alasan blokir" : "Nama"; if (t === "WALKIN") $("#mDt", m.el).value = witaDateTimeInput(now()); };
     fill(); sync(); $("#mLok", m.el).onchange = fill; $("#mTipe", m.el).onchange = sync;
     $("#mGo", m.el).onclick = async e => {
-        const t = $("#mTipe", m.el).value, lokasi = $("#mLok", m.el).value, room = $("#mRoom", m.el).value, s = fromDateTimeInput($("#mDt", m.el).value), dur = parseFloat($("#mDur", m.el).value);
+        const btn = e.currentTarget, t = $("#mTipe", m.el).value, lokasi = $("#mLok", m.el).value, room = $("#mRoom", m.el).value, s = fromDateTimeInput($("#mDt", m.el).value), dur = parseFloat($("#mDur", m.el).value);
         if (!room || !s || !(dur > 0)) return toast("Lengkapi room, waktu, dan durasi", "error");
         const nama = $("#mNama", m.el).value.trim() || (t === "WALKIN" ? "Walk-in" : t === "BLOK" ? "Ditutup" : ""); if (!nama) return toast("Isi nama", "error");
         const secret = randSecret(16), kode = genKode(), bid = randSecret(8), en = s + Math.round(dur * H), wa = normWA($("#mWa", m.el).value), dp = parseNum($("#mDp", m.el).value), total = parseNum($("#mTot", m.el).value);
@@ -531,12 +541,12 @@ function manualModal(pre = {}) {
         const data = { bid, kode, nama, wa: t === "BLOK" ? "" : wa, lokasi, room, tanggal: witaDate(s), jamMulai: witaTime(s), durasi: dur, startMs: s, endMs: en, orang: t === "BLOK" ? 0 : parseInt($("#mOrg", m.el).value) || 1, mic: 0, status, tipe: t, createdAt: serverTimestamp(), upd: serverTimestamp(), slot: true };
         if (total) data.total = total; if (dp) { data.dpPaid = dp; data.dpPaidMethod = "CASH"; data.dpPaidAt = now(); }
         const add = { lokasi, room, s, e: en, bid, k: t === "WALKIN" ? "walkin" : t === "BLOK" ? "block" : "booked" }; data.slotKind = add.k;
-        setBusy(e.currentTarget, true, "Menyimpan…");
+        setBusy(btn, true, "Menyimpan…");
         const ok = await run(async () => {
             await applyTx({ add, bufMs: bufMs(), alive, bookingRef: doc(db, "bookings", secret), bookingData: data, bookingCreate: true, force: $("#mForce", m.el).checked });
             if (wa && t !== "BLOK") await setDoc(doc(db, "lookups", await lookupId(kode, wa)), { s: secret });
         }, "Tersimpan");
-        if (ok) m.close(); else setBusy(e.currentTarget, false);
+        if (ok) m.close(); else setBusy(btn, false);
     };
 }
 
@@ -627,16 +637,23 @@ async function cleanup(days = 30) {
             try { if (b.kode && b.wa) await deleteDoc(doc(db, "lookups", await lookupId(b.kode, b.wa))); } catch (e) { }
             await deleteDoc(d.ref); n++;
         }
-        toast(`${n} booking lama dihapus`, "success");
+        const cutDate = witaDate(cut), av = await getDocs(collection(db, "availability"));
+        const oldAv = av.docs.filter(d => d.id.split("__").pop() < cutDate);
+        for (let i = 0; i < oldAv.length; i += 500) {
+            const batch = writeBatch(db);
+            oldAv.slice(i, i + 500).forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+        toast(`${n} booking dan ${oldAv.length} data jadwal lama dihapus`, "success");
     } catch (e) { toast("Gagal membersihkan: " + (e.code || e.message), "error"); }
 }
 
 async function resetAllData() {
-    const confirm = await confirmBox("RESET TOTAL DATABASE", "Apakah Anda yakin? Tindakan ini akan menghapus SEMUA data (booking, room, pengaturan, QRIS) secara permanen dan mengembalikan aplikasi ke kondisi awal seperti baru. Tindakan ini tidak dapat dibatalkan.", "Ya, Reset Semua", true);
-    if (!confirm) return;
-    
+    const ok = await confirmBox("RESET TOTAL DATABASE", "Apakah Anda yakin? Tindakan ini akan menghapus SEMUA data (booking, room, pengaturan, QRIS) secara permanen dan mengembalikan aplikasi ke kondisi awal seperti baru. Tindakan ini tidak dapat dibatalkan.", "Ya, Reset Semua", true);
+    if (!ok) return;
+
     const m = modal(`<h3>Menghapus Data...</h3><p>Mohon tunggu, sedang menghapus semua data dari database.</p><progress style="width:100%"></progress>`, { sticky: true, wide: false });
-    
+
     try {
         const cols = ["bookings", "availability", "proofs", "lookups"];
         for (const c of cols) {
@@ -650,14 +667,14 @@ async function resetAllData() {
                 }
             }
         }
-        
+
         try { await deleteDoc(doc(db, "config", "settings")); } catch(e) {}
         try { await deleteDoc(doc(db, "config", "qris")); } catch(e) {}
-        
+
         localStorage.removeItem("araya_mine");
         localStorage.removeItem("araya_sub");
         sessionStorage.clear();
-        
+
         toast("Database berhasil di-reset. Memuat ulang...", "success");
         setTimeout(() => location.reload(), 1500);
     } catch (err) {

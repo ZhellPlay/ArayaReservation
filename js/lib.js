@@ -112,7 +112,7 @@ export const DEFAULT_SETTINGS = {
 
 export function mergeSettings(s) {
     const d = DEFAULT_SETTINGS; s = s || {};
-    return { ...d, ...s, templates: { ...d.templates, ...(s.templates || {}) }, rooms: { ...d.rooms, ...(s.rooms || {}) }, lokasi: s.lokasi || d.lokasi, holidays: s.holidays || [] };
+    return { ...d, ...s, templates: { ...d.templates, ...(s.templates || {}) }, rooms: s.rooms || d.rooms, lokasi: s.lokasi || d.lokasi, holidays: s.holidays || [] };
 }
 
 export const roomCfg = (st, lokasi, room) => (st.rooms[lokasi] || []).find(r => r.name === room);
@@ -133,10 +133,12 @@ export const siteLink = () => location.origin + location.pathname.replace(/[^/]*
 export const bookingLink = secret => siteLink() + "index.html#/b/" + secret;
 
 export function toast(message, type = "info") {
+    let box = $("#toasts");
+    if (!box) { box = document.createElement("div"); box.id = "toasts"; box.className = "toast-stack"; document.body.appendChild(box); }
     const t = document.createElement("div"); t.className = "toast " + type;
     const icons = { success: "check_circle", error: "error", info: "info" };
     t.innerHTML = `<span class="material-icons-round" style="font-size:18px">${icons[type] || "info"}</span><span>${esc(message)}</span>`;
-    document.body.appendChild(t);
+    box.appendChild(t);
     if (type === "error") { const fc = $(".form-card"); if (fc) { fc.classList.remove("shake"); void fc.offsetWidth; fc.classList.add("shake"); } }
     setTimeout(() => { t.style.opacity = "0"; t.style.transform = "translateX(120%)"; setTimeout(() => t.remove(), 300); }, 4200);
 }

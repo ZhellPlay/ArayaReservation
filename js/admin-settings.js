@@ -1,9 +1,9 @@
 import { db, doc, setDoc } from "./fb.js";
-import { $, $$, esc, parseNum, normWA, icon, compressImage, qrSvg, toast, rupiah, DEFAULT_SETTINGS, modal } from "./lib.js";
+import { $, $$, esc, parseNum, normWA, icon, compressImage, qrSvg, toast, DEFAULT_SETTINGS, modal, now } from "./lib.js";
 import { validateQris, decodeQrFromFile, makeDynamic } from "./qris.js";
 
 const roomRow = r => `<tr data-row>
-  <td><input data-f="name" value="${esc(r.name)}" style="min-width:110px"></td>
+  <td><input data-f="name" value="${esc(r.name)}" maxlength="30" style="min-width:110px"></td>
   <td><input data-f="rate" inputmode="numeric" value="${r.rate || ""}" placeholder="0" style="width:90px"></td>
   <td><input data-f="baseCap" inputmode="numeric" value="${r.baseCap ?? 4}" style="width:60px"></td>
   <td><input data-f="maxCap" inputmode="numeric" value="${r.maxCap || ""}" placeholder="∞" style="width:60px"></td>
@@ -20,14 +20,14 @@ const lokBlock = (l, rms) => `<div class="lok-block" data-loksec="${esc(l)}">
         <tbody>${rms.map(roomRow).join("")}</tbody>
     </table></div>
     <button class="btn btn-ghost btn-sm" data-addroom="${esc(l)}" type="button" style="margin-top:12px">${icon("add", 14)} Tambah room</button>
-    
+
     <h4 class="subsec-title" style="margin-top:24px">QRIS ${esc(l)}</h4>
     <p class="muted">Upload QRIS merchant cabang ini. Tersimpan otomatis.</p>
     <div class="muted" data-qinfo="${esc(l)}" style="margin-top:8px"></div>
     <div data-qprev="${esc(l)}"></div>
     <input type="file" accept="image/*" data-qfile="${esc(l)}" style="margin-top:8px">
     <div class="row-btns"><button class="btn btn-delete btn-sm" data-qdel="${esc(l)}" type="button">${icon("delete", 14)} Hapus QRIS</button></div>
-    
+
     <div class="row-btns" style="margin-top:16px;border-top:1px dashed var(--border-subtle);padding-top:16px">
         <button class="btn btn-delete btn-sm" data-removelok="${esc(l)}" type="button">${icon("delete_forever", 14)} Hapus cabang "${esc(l)}"</button>
     </div>
@@ -54,22 +54,22 @@ function getDiff(oldSt, nextSt) {
     if (oldSt.addonPerHour !== nextSt.addonPerHour) diffs.push(`Biaya tambahan per jam: ${oldSt.addonPerHour ? "Ya" : "Tidak"} → ${nextSt.addonPerHour ? "Ya" : "Tidak"}`);
     if (oldSt.adminWA !== nextSt.adminWA) diffs.push(`WA Admin diperbarui`);
     if (oldSt.policy !== nextSt.policy) diffs.push(`Teks Kebijakan diperbarui`);
-    
+
     const addedLok = nextSt.lokasi.filter(l => !oldSt.lokasi.includes(l));
     const removedLok = oldSt.lokasi.filter(l => !nextSt.lokasi.includes(l));
     addedLok.forEach(l => diffs.push(`Menambah cabang: ${l}`));
     removedLok.forEach(l => diffs.push(`Menghapus cabang: ${l}`));
-    
+
     nextSt.lokasi.forEach(l => {
         if (!oldSt.lokasi.includes(l)) return;
         const oldRooms = oldSt.rooms[l] || [];
         const newRooms = nextSt.rooms[l] || [];
-        
+
         const addedR = newRooms.filter(r => !oldRooms.find(o => o.name === r.name));
         const removedR = oldRooms.filter(r => !newRooms.find(n => n.name === r.name));
         addedR.forEach(r => diffs.push(`Cabang ${l}: tambah room ${r.name}`));
         removedR.forEach(r => diffs.push(`Cabang ${l}: hapus room ${r.name}`));
-        
+
         newRooms.forEach(r => {
             const o = oldRooms.find(x => x.name === r.name);
             if (o) {
@@ -84,7 +84,7 @@ function getDiff(oldSt, nextSt) {
 
     const h1 = JSON.stringify(oldSt.holidays || []), h2 = JSON.stringify(nextSt.holidays || []);
     if (h1 !== h2) diffs.push(`Daftar hari libur berubah`);
-    
+
     const tplChanged = Object.keys(nextSt.templates).some(k => oldSt.templates[k] !== nextSt.templates[k]);
     if (tplChanged) diffs.push(`Template pesan WhatsApp diperbarui`);
 
@@ -95,7 +95,7 @@ export function renderSettings(el, S, H) {
     const st = S.st;
     let hol = [...(st.holidays || [])];
     S.dirty = false;
-    
+
     const num = (id, v, label, hint = "") => `<div class="form-group"><label>${label}</label><input id="${id}" inputmode="decimal" value="${v ?? ""}">${hint ? `<small class="hint" style="margin-top:4px">${hint}</small>` : ""}</div>`;
 
     el.innerHTML = `
@@ -112,7 +112,7 @@ export function renderSettings(el, S, H) {
       <p class="muted" style="margin-bottom:16px">Default 1 cabang dengan 1 room. Tambah atau hapus sesuai kebutuhan. Minimal 1 cabang dan 1 room per cabang.</p>
       <div id="lokList">${st.lokasi.map(l => lokBlock(l, st.rooms[l] || [])).join("")}</div>
       <div class="add-lok">
-        <input id="lokNew" placeholder="Nama cabang baru (mis. GAMBUT)">
+        <input id="lokNew" maxlength="30" placeholder="Nama cabang baru (mis. GAMBUT)">
         <button class="btn btn-ghost" id="lokAdd" type="button">${icon("add", 16)} Tambah</button>
       </div>
     </details></div>
@@ -143,15 +143,14 @@ export function renderSettings(el, S, H) {
     <div class="form-card"><details class="set-sec"><summary>${icon("build")} <span style="flex:1;text-align:left">Perawatan Data</span></summary>
       <p class="muted" style="margin-bottom:16px">Ekspor dulu, lalu bersihkan booking lama (&gt; 30 hari) untuk menghemat kuota Firebase.</p>
       <div class="row-btns"><button class="btn btn-ghost" id="mExp">${icon("download", 16)} Ekspor CSV</button><button class="btn btn-delete" id="mClean">${icon("delete_sweep", 16)} Bersihkan data lama</button></div>
-      
+
       <div style="margin-top:24px; border-top:1px dashed var(--danger-border); padding-top:24px;">
         <p class="muted" style="margin-bottom:12px; color:var(--danger)"><b>Zona Berbahaya:</b> Menghapus semua data secara permanen.</p>
         <button class="btn btn-delete" id="mResetAll" style="width:100%">${icon("dangerous", 16)} Reset Total Database</button>
       </div>
     </details></div>`;
 
-    el.addEventListener("input", () => S.dirty = true);
-    el.addEventListener("change", () => S.dirty = true);
+    el.oninput = e => { if (S.tab === "settings" && !e.target.matches("[data-qfile]")) S.dirty = true; };
 
     const drawQ = () => $$("[data-loksec]", el).forEach(sec => {
         const l = sec.dataset.loksec, q = S.qris[l];
@@ -225,6 +224,7 @@ export function renderSettings(el, S, H) {
     $("#lokAdd", el).onclick = () => {
         const name = $("#lokNew", el).value.trim();
         if (!name) return toast("Isi nama cabang", "error");
+        if (name.length > 30) return toast("Nama cabang maksimal 30 karakter", "error");
         if ($$(`[data-loksec="${CSS.escape(name)}"]`, el).length) return toast("Cabang sudah ada", "error");
         $("#lokList", el).insertAdjacentHTML("beforeend", lokBlock(name, [{ name: "Room 1", rate: 0, baseCap: 4, maxCap: 10, extraPrice: 0, active: true }]));
         $("#lokNew", el).value = "";
@@ -243,7 +243,8 @@ export function renderSettings(el, S, H) {
     $("#mClean", el).onclick = () => H.cleanup(30);
     $("#mResetAll", el).onclick = H.resetAllData;
 
-    $("#setSave", el).onclick = async e => {
+    $("#setSave", el).onclick = async () => {
+        const saveBtn = $("#setSave", el);
         const g = id => parseFloat(String($("#" + id, el).value).replace(",", ".")) || 0;
         const nextLokasi = [], nextRooms = {};
         for (const sec of $$("[data-loksec]", el)) {
@@ -254,6 +255,7 @@ export function renderSettings(el, S, H) {
             for (const tr of rows) {
                 const f = n => $(`[data-f=${n}]`, tr), name = f("name").value.trim();
                 if (!name) return toast(`Nama room di ${l} tidak boleh kosong`, "error");
+                if (name.length > 30) return toast(`Nama room "${name}" maksimal 30 karakter`, "error");
                 if (names.has(name)) return toast(`Nama room ganda di ${l}: ${name}`, "error");
                 names.add(name);
                 nextRooms[l].push({ name, rate: parseNum(f("rate").value), baseCap: parseInt(f("baseCap").value) || 1, maxCap: parseInt(f("maxCap").value) || 0, extraPrice: parseNum(f("extraPrice").value), active: f("active").checked });
@@ -261,16 +263,19 @@ export function renderSettings(el, S, H) {
             if (!nextRooms[l].length) return toast(`Cabang ${l} minimal punya 1 room`, "error");
         }
         if (!nextLokasi.length) return toast("Minimal 1 cabang", "error");
+        const orphan = S.bookings.find(b => ["PENDING", "MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"].includes(b.status) && b.endMs > now()
+            && !(nextRooms[b.lokasi] || []).some(r => r.name === b.room));
+        if (orphan) return toast(`Masih ada booking aktif di ${orphan.lokasi} · ${orphan.room}. Room/cabang itu tidak bisa dihapus atau diganti nama sebelum bookingnya selesai.`, "error");
         const next = {
             ...st, dpPercent: g("sDp"), holdMinutes: g("sHold"), bufferMin: g("sBuf"), noShowGraceMin: g("sGrace"),
-            pendingTtlHours: g("sTtl"), minLeadMin: g("sLead"), maxDurasi: g("sMaxD") || 12,
+            pendingTtlHours: g("sTtl"), minLeadMin: g("sLead"), maxDurasi: Math.min(24, Math.max(1, g("sMaxD") || 12)),
             micPrice: parseNum($("#sMic", el).value), addonPerHour: $("#sPerHour", el).checked,
             adminWA: $("#sWa", el).value.trim() ? normWA($("#sWa", el).value) : "", policy: $("#sPolicy", el).value.trim(),
             holidays: hol, lokasi: nextLokasi, rooms: nextRooms, templates: {}
         };
         if (next.dpPercent < 1 || next.dpPercent > 100) return toast("DP harus 1–100%", "error");
         $$("[data-tpl]", el).forEach(t => next.templates[t.dataset.tpl] = t.value);
-        
+
         const diffs = getDiff(st, next);
         if (!diffs.length) {
             S.dirty = false;
@@ -296,23 +301,23 @@ export function renderSettings(el, S, H) {
                 <button class="btn btn-save" id="confirmSave">Simpan</button>
             </div>
         `, { wide: false });
-        
+
         $("#confirmSave", m.el).onclick = async () => {
             m.close();
             S.dirty = false;
-            e.currentTarget.disabled = true;
+            saveBtn.disabled = true;
             try {
                 await setDoc(doc(db, "config", "settings"), next);
                 Object.assign(S.st, next);
                 S.needSeed = false;
-                
+
                 const removedLok = st.lokasi.filter(l => !nextLokasi.includes(l));
                 if (removedLok.some(l => S.qris[l])) {
                     removedLok.forEach(l => { if (S.qris[l]) delete S.qris[l]; });
                     await setDoc(doc(db, "config", "qris"), S.qris);
                 }
                 toast("Pengaturan tersimpan", "success");
-                
+
                 if (S.pendingTab && H.switchTab) {
                     const t = S.pendingTab;
                     S.pendingTab = null;
@@ -322,7 +327,7 @@ export function renderSettings(el, S, H) {
                 S.dirty = true;
                 toast("Gagal menyimpan: " + (err.code || err.message), "error");
             }
-            e.currentTarget.disabled = false;
+            saveBtn.disabled = false;
         };
     };
 }
