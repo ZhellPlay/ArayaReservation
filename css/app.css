@@ -256,6 +256,7 @@ label.check input[type="checkbox"] { margin-top: 1px; }
 .lok-block { border: 1px solid var(--border-subtle); border-left: 3px solid var(--accent-2); padding: var(--space-lg); margin-bottom: var(--space-lg); background: var(--bg-inset); }
 .lok-block:last-child { margin-bottom: 0; }
 .lok-title { font-family: var(--font-display); font-size: 16px; letter-spacing: 1px; margin-bottom: var(--space-md); color: var(--accent-1); display: flex; align-items: center; gap: var(--space-sm); }
+.lok-title input { flex: 1; min-width: 0; font-family: var(--font-display); font-size: 16px; letter-spacing: 1px; color: var(--accent-1); }
 
 .add-lok { display: flex; gap: var(--space-md); align-items: stretch; margin-top: var(--space-lg); }
 .add-lok input { flex: 1; min-width: 0; }
