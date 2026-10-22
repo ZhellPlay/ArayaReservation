@@ -8,10 +8,14 @@ export function crc16(str) {
 }
 export function parseTLV(s) {
     const out = []; let i = 0;
-    while (i + 4 <= s.length) {
-        const tag = s.substr(i, 2), len = parseInt(s.substr(i + 2, 2), 10);
-        if (isNaN(len) || i + 4 + len > s.length) throw new Error("Format QRIS tidak valid");
-        out.push([tag, s.substr(i + 4, len)]); i += 4 + len;
+    while (i < s.length) {
+        if (i + 4 > s.length) throw new Error("Format QRIS tidak valid");
+        const tag = s.slice(i, i + 2), rawLen = s.slice(i + 2, i + 4);
+        if (!/^\d{2}$/.test(tag) || !/^\d{2}$/.test(rawLen)) throw new Error("Format QRIS tidak valid");
+        const len = Number(rawLen), end = i + 4 + len;
+        if (end > s.length) throw new Error("Format QRIS tidak valid");
+        out.push([tag, s.slice(i + 4, end)]);
+        i = end;
     }
     return out;
 }
@@ -35,14 +39,21 @@ export function makeDynamic(staticPayload, amount) {
     return body + crc16(body);
 }
 export async function decodeQrFromFile(file) {
+    if (!file || !file.type.startsWith("image/")) throw new Error("Pilih file gambar yang valid.");
     const bmp = await createImageBitmap(file);
-    for (const maxSide of [1200, 800, 1600, 500]) {
-        const sc = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
-        const c = document.createElement("canvas"); c.width = Math.round(bmp.width * sc); c.height = Math.round(bmp.height * sc);
-        const cx = c.getContext("2d", { willReadFrequently: true }); cx.drawImage(bmp, 0, 0, c.width, c.height);
-        const d = cx.getImageData(0, 0, c.width, c.height);
-        const r = window.jsQR(d.data, d.width, d.height, { inversionAttempts: "attemptBoth" });
-        if (r && r.data) return r.data;
+    try {
+        for (const maxSide of [1200, 800, 1600, 500]) {
+            const sc = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+            const c = document.createElement("canvas"); c.width = Math.round(bmp.width * sc); c.height = Math.round(bmp.height * sc);
+            const cx = c.getContext("2d", { willReadFrequently: true });
+            if (!cx) throw new Error("Browser tidak mendukung pemrosesan gambar.");
+            cx.drawImage(bmp, 0, 0, c.width, c.height);
+            const d = cx.getImageData(0, 0, c.width, c.height);
+            const r = window.jsQR(d.data, d.width, d.height, { inversionAttempts: "attemptBoth" });
+            if (r && r.data) return r.data;
+        }
+        throw new Error("QR tidak terbaca. Pakai foto/screenshot QRIS yang lurus dan terang.");
+    } finally {
+        bmp.close?.();
     }
-    throw new Error("QR tidak terbaca. Pakai foto/screenshot QRIS yang lurus dan terang.");
 }
