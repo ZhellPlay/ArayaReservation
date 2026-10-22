@@ -210,7 +210,7 @@ function cardHTML(b, i = 0) {
     const clash = isOpen(b.status) && S.bookings.some(o => o.id !== b.id && o.lokasi === b.lokasi && o.room === b.room && ["TERKONFIRMASI", "CHECKED_IN", "MENUNGGU_VERIFIKASI"].includes(o.status) && ["TERKONFIRMASI", "CHECKED_IN", "MENUNGGU_VERIFIKASI"].includes(b.status) && b.startMs < o.endMs && b.endMs > o.startMs);
     let money = "";
     if (b.total) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Total ${rupiah(b.total)} · DP ${rupiah(b.dpDue)} ${b.dpPaid ? `<b class="okc">✔ diterima ${rupiah(b.dpPaid)}</b>` : b.payAmount && b.dpMethod === "QRIS" ? `(transfer ${rupiah(b.payAmount)})` : ""}</span></div>`;
-    else if (b.estTotal) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Estimasi ${rupiah(b.estTotal)}${b.cashDp ? " · minta DP Cash" : ""}</span></div>`;
+    else if (b.estTotal) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Estimasi ${rupiah(b.estTotal)}${b.cashDp ? " · Cash" : ""}</span></div>`;
     const A = [], id = `data-id="${b.id}"`, bt = (act, cls, ic, txt) => `<button class="btn ${cls}" data-act="${act}" ${id}>${icon(ic, 15)}${txt}</button>`;
     if (st === "PENDING") A.push(bt("approve", "btn-ok", "check", "Setujui"), bt("reject", "btn-delete", "close", "Tolak"));
     if (st === "MENUNGGU_BAYAR") A.push(bt("remind", "btn-wa", "chat", "Ingatkan"), bt("cancel", "btn-delete", "block", "Batalkan"));
@@ -399,7 +399,14 @@ async function verifyModal(b) {
     let img = ""; try { const p = await getDoc(doc(db, "proofs", b.id)); if (p.exists() && String(p.data().img).startsWith("data:image/")) img = p.data().img; } catch (e) { }
     const m = modal(`<h3>${icon("fact_check")} Verifikasi pembayaran</h3>
       <div class="banner ok" style="flex-direction:column;gap:4px"><span>Cari di mutasi / notifikasi merchant QRIS:</span><b style="font-size:24px;font-family:Orbitron">${rupiah(b.payAmount)}</b><span class="muted">Nominal harus PERSIS sama. Dilaporkan ${b.paidReportedAt ? esc(fmtDT(b.paidReportedAt)) : "-"}${b.sender ? " · pengirim: " + esc(b.sender) : ""}</span></div>
-      ${img ? `<img class="proof-img" src="${img}" alt="bukti">` : `<p class="muted center">Tidak ada screenshot terlampir. Cocokkan langsung di mutasi.</p>`}
+      ${img ? `
+        <img class="proof-img" src="${img}" alt="bukti">
+        <div class="row-btns" style="justify-content:center; margin-top:10px;">
+            <a href="${img}" download="bukti-${b.kode}.jpg" class="btn btn-ghost" style="text-decoration:none;">
+                ${icon("download", 16)} Unduh Foto
+            </a>
+        </div>
+      ` : `<p class="muted center">Tidak ada screenshot terlampir. Cocokkan langsung di mutasi.</p>`}
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Tutup</button><button class="btn btn-delete" id="vNo">Belum masuk</button><button class="btn btn-ok" id="vOk">${icon("check", 16)} Sudah masuk</button></div>`);
     $("#vOk", m.el).onclick = async () => {
         const patch = { status: "TERKONFIRMASI", dpPaid: b.payAmount, dpPaidMethod: "QRIS", dpPaidAt: now(), verifiedAt: now() };
@@ -413,14 +420,34 @@ async function verifyModal(b) {
 }
 
 function receiveModal(b) {
-    const m = modal(`<h3>${icon("payments")} Verifikasi Cash</h3><p>${esc(b.nama)} · Total ${rupiah(b.total)} / DP ${rupiah(b.dpDue)}</p>
-      <div class="form-grid"><div class="form-group"><label>Nominal diterima</label><input id="dNom" data-money inputmode="numeric" value="${fmtNum(b.dpDue)}"></div>
-      <div class="form-group"><label>Cara</label><select id="dMet"><option value="CASH" ${b.dpMethod === "CASH" ? "selected" : ""}>Cash</option><option value="QRIS" ${b.dpMethod === "QRIS" ? "selected" : ""}>QRIS / transfer</option></select></div></div>
+    const m = modal(`<h3>${icon("payments")} Verifikasi Pembayaran</h3><p>${esc(b.nama)} · Total ${rupiah(b.total)} / DP ${rupiah(b.dpDue)}</p>
+      <div class="form-grid">
+        <div class="form-group"><label>Nominal diterima</label><input id="dNom" data-money inputmode="numeric" value="${fmtNum(b.dpDue)}"></div>
+        <div class="form-group"><label>Metode</label><select id="dMet"><option value="CASH">Cash</option><option value="QRIS">QRIS / Transfer</option></select></div>
+      </div>
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-ok" id="dGo">Konfirmasi</button></div>`);
     $("#dGo", m.el).onclick = async () => {
         const nom = parseNum($("#dNom", m.el).value); if (!nom) return toast("Isi nominal", "error");
-        const patch = { status: "CHECKED_IN", dpPaid: nom, dpPaidMethod: $("#dMet", m.el).value, dpPaidAt: now(), checkedInAt: now(), verifiedAt: now() };
-        if (await run(async () => { await changeStatus(b, patch, { add: addOf(b, "CHECKED_IN") }); try { await deleteDoc(doc(db, "proofs", b.id)); } catch (e) { } }, "Cash diverifikasi, selamat bermain!")) { m.close(); }
+        const method = $("#dMet", m.el).value;
+        
+        let patch = { dpPaid: nom, dpPaidMethod: method, dpPaidAt: now(), verifiedAt: now() };
+        
+        if (method === "CASH") {
+            patch.status = "TERKONFIRMASI";
+            patch.checkedInAt = null;
+        } else {
+            patch.status = "MENUNGGU_BAYAR";
+            patch.dpMethod = "QRIS";
+            patch.payAmount = nom;
+            patch.payDeadline = now() + 15 * 60000;
+        }
+
+        if (await run(async () => { 
+            await changeStatus(b, patch, { add: addOf(b, patch.status, patch.payDeadline) }); 
+            try { await deleteDoc(doc(db, "proofs", b.id)); } catch (e) { } 
+        }, method === "CASH" ? "Cash diverifikasi" : "Berhasil ganti ke QRIS")) { 
+            m.close(); 
+        }
     };
 }
 
@@ -428,16 +455,30 @@ function detailModal(b) {
     const st = eff(b), r = roomCfg(S.st, b.lokasi, b.room), extra = r ? Math.max(0, b.orang - r.baseCap) : 0;
     
     let actionHtml = "";
-    if (["MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI"].includes(st)) {
-        actionHtml = "";
-    } else if (["SELESAI", "DITOLAK", "DIBATALKAN", "KEDALUWARSA", "NO_SHOW"].includes(st)) {
-        actionHtml = `<div class="row-btns" style="justify-content: center;"><button class="btn btn-delete" id="dDel">${icon("delete", 15)} Hapus</button></div>`;
-    } else {
+    if (st === "PENDING") {
         actionHtml = `<div class="row-btns">
-            ${st === 'PENDING' ? `<button class="btn btn-ok" id="dApp">${icon("check", 15)} Setujui</button><button class="btn btn-delete" id="dRej">${icon("close", 15)} Tolak</button>` : ''}
-            ${st === 'TERKONFIRMASI' && b.dpMethod === "CASH" && !b.dpPaid ? `<button class="btn btn-ok" id="dVCash">${icon("payments", 15)} Verifikasi Cash</button>` : ''}
-            ${['TERKONFIRMASI', 'CHECKED_IN'].includes(st) ? `<button class="btn btn-ghost" id="dEdit">${icon("edit", 15)} Edit</button><button class="btn btn-ghost" id="dLink">${icon("link", 15)} Salin link</button>` : ''}
-            ${b.wa && !['MENUNGGU_BAYAR', 'MENUNGGU_VERIFIKASI'].includes(st) ? `<button class="btn btn-wa" id="dWa">${icon("chat", 15)} WA</button>` : ''}
+            <button class="btn btn-ghost" id="dEdit">${icon("edit", 15)} Edit</button>
+            ${b.wa ? `<button class="btn btn-wa" id="dWa">${icon("chat", 15)} WA</button>` : ""}
+            <button class="btn btn-delete" id="dDel">${icon("delete", 15)} Hapus</button>
+        </div>`;
+    } else if (st === "MENUNGGU_BAYAR") {
+        actionHtml = `<div class="row-btns">
+            <button class="btn btn-ghost" id="dEdit">${icon("edit", 15)} Edit</button>
+        </div>`;
+    } else if (st === "MENUNGGU_VERIFIKASI") {
+        actionHtml = `<div class="row-btns">
+            <button class="btn btn-ghost" id="dEdit">${icon("edit", 15)} Edit</button>
+            ${b.wa ? `<button class="btn btn-wa" id="dWa">${icon("chat", 15)} WA</button>` : ""}
+            <button class="btn btn-delete" id="dDel">${icon("delete", 15)} Hapus</button>
+        </div>`;
+    } else if (st === "TERKONFIRMASI") {
+        actionHtml = `<div class="row-btns">
+            <button class="btn btn-ghost" id="dEdit">${icon("edit", 15)} Edit</button>
+            ${b.wa ? `<button class="btn btn-wa" id="dWa">${icon("chat", 15)} WA</button>` : ""}
+            <button class="btn btn-delete" id="dDel">${icon("delete", 15)} Hapus</button>
+        </div>`;
+    } else if (["SELESAI", "DITOLAK", "DIBATALKAN", "KEDALUWARSA", "NO_SHOW"].includes(st)) {
+        actionHtml = `<div class="row-btns" style="justify-content: center;">
             <button class="btn btn-delete" id="dDel">${icon("delete", 15)} Hapus</button>
         </div>`;
     }
