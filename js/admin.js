@@ -4,7 +4,7 @@ import {
 } from "./fb.js";
 import {
     $, $$, esc, toast, modal, confirmBox, promptBox, setBusy, copyText, icon, rupiah, fmtNum, parseNum, normWA, randSecret, genKode, lookupId, normKode,
-    witaDate, witaTime, witaDateTimeInput, fromDateTimeInput, addDays, fmtDate, fmtDT, tsMs, now, syncClock, STATUS, HOLDING, pill, effStatus,
+    witaDate, witaTime, witaDateTimeInput, fromDateTimeInput, addDays, fmtDate, fmtDT, tsMs, now, syncClock, STATUS, HOLDING, pill, effStatus, getEndMs,
     mergeSettings, roomCfg, calcPrice, fillTpl, waLink, bookingLink, siteLink, startBackground
 } from "./lib.js";
 import { applyTx } from "./avail.js";
@@ -25,7 +25,10 @@ const rangeOf = b => ({ lokasi: b.lokasi, room: b.room, s: b.startMs, e: b.endMs
 const kindOf = (b, status = b.status) => status === "MENUNGGU_BAYAR" ? "hold" : b.tipe === "WALKIN" ? "walkin" : b.tipe === "BLOK" ? "block" : "booked";
 const addOf = (b, status = b.status, deadline = b.payDeadline) => { const k = kindOf(b, status), a = { ...rangeOf(b), k }; if (k === "hold") a.until = (deadline || now()) + GRACE; return a; };
 const refOf = b => doc(db, "bookings", b.id);
-const rangeTxt = b => `${b.jamMulai}–${witaTime(b.endMs)}`;
+const rangeTxt = b => {
+    if (b.status === "CHECKED_IN" && b.checkedInAt) return `${witaTime(b.checkedInAt)}–${witaTime(getEndMs(b))}`;
+    return `${b.jamMulai}–${witaTime(b.endMs)}`;
+};
 const isOpen = s => ["PENDING", "MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"].includes(s);
 
 window.addEventListener("beforeunload", (e) => {
@@ -352,7 +355,7 @@ async function deepSearch(q) {
 function approveModal(b) {
     const r = roomCfg(S.st, b.lokasi, b.room) || { rate: 0, baseCap: 4, extraPrice: 0 }, p = calcPrice(S.st, r, b.durasi, b.orang, b.mic || 0);
     const clashes = S.bookings.filter(o => o.id !== b.id && o.lokasi === b.lokasi && o.room === b.room && b.startMs < o.endMs + bufMs() && b.endMs > o.startMs - bufMs());
-    const hard = clashes.filter(o => ["MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"].includes(o.status) || (o.status === "MENUNGGU_BAYAR" && eff(o) !== "KEDALUWARSA"));
+    const hard = clashes.filter(o => ["MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"].includes(o.status) || (o.status === "MENUNGGU_BAYAR" && eff(o) !== "HANGUS"));
     const rivals = clashes.filter(o => eff(o) === "PENDING");
     const cashDefault = !!b.cashDp, hold = S.st.holdMinutes || 30;
     const defDeadline = cashDefault ? Math.max(b.startMs, now() + 30 * 60000) : now() + hold * 60000;
@@ -481,7 +484,7 @@ function detailModal(b) {
             ${b.wa ? `<button class="btn btn-wa" id="dWa">${icon("chat", 15)} WA</button>` : ""}
             <button class="btn btn-delete" id="dDel">${icon("delete", 15)} Hapus</button>
         </div>`;
-    } else if (["SELESAI", "DITOLAK", "DIBATALKAN", "KEDALUWARSA"].includes(st)) {
+    } else if (["SELESAI", "DITOLAK", "DIBATALKAN", "HANGUS"].includes(st)) {
         actionHtml = `<div class="row-btns" style="justify-content: center;">
             <button class="btn btn-delete" id="dDel">${icon("delete", 15)} Hapus</button>
         </div>`;
@@ -632,10 +635,15 @@ async function sweep() {
     try {
         const t = now();
         for (const b of S.bookings) {
-            if (b.status === "PENDING" && eff(b) === "KEDALUWARSA") await changeStatus(b, { status: "KEDALUWARSA" });
-            else if (b.status === "MENUNGGU_BAYAR" && (b.payDeadline || 0) + GRACE < t) await changeStatus(b, { status: "KEDALUWARSA" }, { release: !!b.slot });
-            else if (!HOLDING.includes(b.status) && b.slot === true) await changeStatus(b, {}, { release: true });
-            else if (b.status === "MENUNGGU_VERIFIKASI" && b.slotKind !== "booked") {
+            const expected = eff(b, S.st, t);
+            if (expected !== b.status) {
+                if (expected === "HANGUS" || expected === "SELESAI") {
+                    await changeStatus(b, { status: expected }, { release: !!b.slot });
+                    toast(`Status ${b.nama} otomatis menjadi ${STATUS[expected][0]}`, "info");
+                }
+            } else if (!HOLDING.includes(b.status) && b.slot === true) {
+                await changeStatus(b, {}, { release: true });
+            } else if (b.status === "MENUNGGU_VERIFIKASI" && b.slotKind !== "booked") {
                 try { await changeStatus(b, {}, { add: addOf(b, "MENUNGGU_VERIFIKASI") }); } catch (e) { if (e.message === "SLOT_BENTROK") toast(`Pembayaran ${b.nama} masuk tapi slot sudah terisi booking lain! Cek manual.`, "error"); }
             }
         }
@@ -732,7 +740,7 @@ async function exportCsv() {
 }
 
 async function cleanup(days = 30) {
-    if (!await confirmBox("Bersihkan data lama?", `Booking selesai/ditolak/batal/kedaluwarsa yang lebih dari ${days} hari akan dihapus permanen. Ekspor CSV dulu kalau perlu.`, "Hapus", true)) return;
+    if (!await confirmBox("Bersihkan data lama?", `Booking selesai/ditolak/batal/hangus yang lebih dari ${days} hari akan dihapus permanen. Ekspor CSV dulu kalau perlu.`, "Hapus", true)) return;
     const cut = now() - days * 86400000; let n = 0;
     try {
         const s = await getDocs(query(collection(db, "bookings"), where("endMs", "<", cut)));

@@ -77,18 +77,25 @@ export const STATUS = {
     CHECKED_IN: ["Sedang Bermain", "#22d3ee"],
     SELESAI: ["Selesai", "#9ca3af"],
     DITOLAK: ["Ditolak", "#ef4444"],
-    KEDALUWARSA: ["Kedaluwarsa", "#9ca3af"],
+    HANGUS: ["Hangus", "#6b7280"],
     DIBATALKAN: ["Dibatalkan", "#9ca3af"]
 };
 export const HOLDING = ["MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"];
 export const pill = st => `<span class="pill" style="--c:${(STATUS[st] || ["", "#999"])[1]}">${esc((STATUS[st] || [st])[0])}</span>`;
 
+export const getEndMs = b => (b.checkedInAt || b.startMs) + b.durasi * H;
+
 export function effStatus(b, st, t = now()) {
     if (b.status === "PENDING") {
         const ttl = (st.pendingTtlHours || 24) * H;
-        if (t > (b.endMs || 0) || (tsMs(b.createdAt) && t > tsMs(b.createdAt) + ttl)) return "KEDALUWARSA";
+        if (t > (b.endMs || 0) || (tsMs(b.createdAt) && t > tsMs(b.createdAt) + ttl)) return "HANGUS";
     }
-    if (b.status === "MENUNGGU_BAYAR" && b.payDeadline && t > b.payDeadline) return "KEDALUWARSA";
+    if (b.status === "MENUNGGU_BAYAR" && b.payDeadline && t > b.payDeadline) return "HANGUS";
+    
+    if (b.status === "TERKONFIRMASI" && t > b.startMs + (st.noShowGraceMin || 15) * 60000) return "HANGUS";
+    
+    if (b.status === "CHECKED_IN" && t > getEndMs(b)) return "SELESAI";
+    
     return b.status;
 }
 

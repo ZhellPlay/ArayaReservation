@@ -1,7 +1,7 @@
 import { db, doc, getDoc, onSnapshot, writeBatch, serverTimestamp } from "./fb.js";
 import {
     $, $$, esc, toast, confirmBox, setBusy, copyText, icon, rupiah, normWA, validWA, randSecret, genKode, normKode, lookupId,
-    toMs, witaDate, witaTime, fmtDate, fmtDT, fmtCountdown, now, syncClock, pill, effStatus, mergeSettings, roomCfg,
+    toMs, witaDate, witaTime, fmtDate, fmtDT, fmtCountdown, now, syncClock, pill, effStatus, mergeSettings, roomCfg, getEndMs,
     isHoliday, calcPrice, waLink, bookingLink, qrSvg, compressImage, downloadQrPng, startBackground
 } from "./lib.js";
 import { rangesForDay, conflictsIn, checkFree } from "./avail.js";
@@ -14,7 +14,7 @@ const mine = () => { try { return JSON.parse(localStorage.getItem("araya_mine") 
 const setMine = a => { try { localStorage.setItem("araya_mine", JSON.stringify(a.slice(0, 30))); } catch (e) { } };
 const remember = it => setMine([{ ...mine().find(x => x.s === it.s), ...it }, ...mine().filter(x => x.s !== it.s)]);
 const patchMine = (s, patch) => setMine(mine().map(x => x.s === s ? { ...x, ...patch } : x));
-const TERMINAL = ["SELESAI", "DITOLAK", "KEDALUWARSA", "DIBATALKAN"];
+const TERMINAL = ["SELESAI", "DITOLAK", "HANGUS", "DIBATALKAN"];
 const forget = s => setMine(mine().filter(x => x.s !== s));
 const recentSubmits = () => { try { return JSON.parse(localStorage.getItem("araya_sub") || "[]").filter(t => Date.now() - t < H); } catch (e) { return []; } };
 
@@ -322,8 +322,8 @@ function renderDetail(secret, b, fresh, ui) {
         }
         body += `</div>`;
     }
-    if (eff === "KEDALUWARSA" && b.status === "MENUNGGU_BAYAR") body += `<div class="panel"><h3>${icon("timer_off")} Waktu pembayaran habis</h3><p class="muted center">Slot dilepas. Kalau kamu <b>sudah terlanjur transfer</b>, segera hubungi admin dengan kode ${esc(b.kode)}.</p></div>`;
-    else if (eff === "KEDALUWARSA") body += `<div class="panel"><h3>${icon("timer_off")} Permintaan kedaluwarsa</h3><p class="muted center">Admin belum sempat memproses sampai batas waktu. Kamu bisa mengajukan lagi.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
+    if (eff === "HANGUS" && b.status === "MENUNGGU_BAYAR") body += `<div class="panel"><h3>${icon("timer_off")} Waktu pembayaran habis</h3><p class="muted center">Slot dilepas. Kalau kamu <b>sudah terlanjur transfer</b>, segera hubungi admin dengan kode ${esc(b.kode)}.</p></div>`;
+    else if (eff === "HANGUS") body += `<div class="panel"><h3>${icon("timer_off")} Permintaan hangus</h3><p class="muted center">Admin belum sempat memproses atau kamu melewati batas waktu. Kamu bisa mengajukan lagi.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
     if (eff === "MENUNGGU_VERIFIKASI") body += `<div class="panel"><h3>${icon("fact_check")} Pembayaran sedang diverifikasi</h3><p class="muted center">Terima kasih! Admin sedang mencocokkan pembayaranmu. Tidak perlu bayar lagi.</p></div>`;
     
     if (eff === "TERKONFIRMASI" || eff === "CHECKED_IN") {
@@ -334,8 +334,9 @@ function renderDetail(secret, b, fresh, ui) {
             }
             body += `<p class="muted center">Tunjukkan QR ini ke admin saat datang. Datang paling lambat ${ST.noShowGraceMin} menit setelah jam mulai.</p><div class="qr-box">${qrSvg(b.kode)}</div><div class="big-code">${esc(b.kode)}</div>`;
         } else {
-            body += `<p class="muted center">Sesi berjalan sampai ${esc(witaTime(b.endMs))}.</p>`;
-            body += `<div class="countdown" data-cd="${b.endMs}">${fmtCountdown(b.endMs - now())}</div>`;
+            const endT = getEndMs(b);
+            body += `<p class="muted center">Sesi berjalan sampai ${esc(witaTime(endT))}.</p>`;
+            body += `<div class="countdown" data-cd="${endT}">${fmtCountdown(endT - now())}</div>`;
         }
         body += `</div>`;
     }
