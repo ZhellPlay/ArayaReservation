@@ -148,7 +148,7 @@ export function renderSettings(el, S, H) {
           </div>`).join("")}
       </div></details></div>
 
-    <button class="btn btn-save btn-block" id="setSave" style="margin-top: 0; margin-bottom: var(--space-xl);">${icon("save")} Simpan Pengaturan</button>
+    <button class="btn btn-save btn-block set-save" id="setSave">${icon("save")} Simpan Pengaturan</button>
 
     <div class="form-card"><details class="set-sec"><summary>${icon("build")} <span style="flex:1;text-align:left">Perawatan Data</span></summary>
       <p class="muted" style="margin-bottom:16px">Ekspor dulu, lalu bersihkan booking lama (&gt; 30 hari) untuk menghemat kuota Firebase.</p>
@@ -226,6 +226,12 @@ export function renderSettings(el, S, H) {
         if (!inp) return;
         const f = inp.files[0]; if (!f) return;
         const l = inp.dataset.qfile;
+        if (S.qris[l]) {
+            if (!await confirmBox("Ganti QRIS?", "Foto QRIS lama akan diganti dengan yang baru. Lanjutkan?", "Ya, Ganti")) {
+                inp.value = "";
+                return;
+            }
+        }
         try {
             const payload = (await decodeQrFromFile(f)).trim(), info = validateQris(payload);
             S.qris[l] = { payload, merchant: info.merchant, image: await compressImage(f, 700, 0.7) };

@@ -52,7 +52,7 @@ async function viewHome() {
         <div class="step-i"><b>4</b><span>Datang &amp; main</span></div>
     </div>
     <a class="btn btn-save btn-block" href="#/new">${icon("add_circle")} Booking Baru</a>
-    <div class="section-header" style="margin-top:34px"><div class="section-title">${icon("confirmation_number", 22)} Booking Saya</div><span class="count-badge">${list.length}</span></div>
+    <div class="section-header" style="margin-top:var(--space-2xl)"><div class="section-title">${icon("confirmation_number", 22)} Booking Saya</div><span class="count-badge">${list.length}</span></div>
     <div class="booking-grid" id="myList">${list.length ? "" : `<div class="empty-state"><span class="material-icons-round">event_busy</span><p>Belum ada booking di perangkat ini</p></div>`}</div>
     <div class="row-btns" style="margin-top:32px; justify-content: center;">
         <a class="btn btn-ghost" href="#/find">${icon("search")} Cari Booking (Link Hilang)</a>
@@ -82,7 +82,7 @@ function cardInner(b, st) {
       <div class="detail-item">${icon("event", 16)}<span class="val">${esc(b.tanggal ? fmtDate(b.tanggal, false) : "")} · ${esc(b.jamMulai || b.jam || "")}</span></div>
     </div>
     <div class="divider"></div>
-    <div class="action-buttons" style="justify-content: space-between; align-items: center;">
+    <div class="card-foot">
         <span class="btn btn-ghost btn-sm" style="pointer-events:none">${icon("visibility", 14)} Lihat Detail</span>
         <button class="btn btn-delete btn-sm" data-forget title="Hapus dari perangkat ini">${icon("close", 14)}</button>
     </div>`;
@@ -300,8 +300,13 @@ function renderDetail(secret, b, fresh, ui) {
         const cash = b.dpMethod === "CASH";
         body += `<div class="panel pay"><h3>${icon("payments")} Bayar DP sebelum waktu habis</h3>
           <div class="countdown" data-cd="${b.payDeadline}">${fmtCountdown(b.payDeadline - now())}</div><p class="muted center">Batas bayar: ${esc(fmtDT(b.payDeadline))} WITA</p>`;
-        if (cash) body += `<div class="kv total"><span>DP Cash</span><b>${rupiah(b.dpDue)}</b></div><p>Bayar DP <b>Cash di tempat</b> sebelum batas waktu. Admin akan mengubah status booking setelah menerima.</p>`;
-        else {
+
+        if (cash) {
+            body += `<div class="kv total"><span>DP Cash</span><b>${rupiah(b.dpDue)}</b></div>
+            <p class="center">Silakan menuju kasir untuk melakukan pembayaran.</p>
+            <div class="qr-box">${qrSvg(b.kode)}</div><div class="big-code">${esc(b.kode)}</div>
+            <p class="muted center">Tunjukkan QR di atas ke admin/kasir untuk diverifikasi (Lunas: ${rupiah(b.total)}).</p>`;
+        } else {
             const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "";
             if (q && q.payload) { try { qr = qrSvg(makeDynamic(q.payload, b.payAmount)); } catch (e) { qr = ""; } }
             body += `<div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(b.payAmount)}</div></div>
@@ -320,6 +325,7 @@ function renderDetail(secret, b, fresh, ui) {
     if (eff === "KEDALUWARSA" && b.status === "MENUNGGU_BAYAR") body += `<div class="panel"><h3>${icon("timer_off")} Waktu pembayaran habis</h3><p class="muted center">Slot dilepas. Kalau kamu <b>sudah terlanjur transfer</b>, segera hubungi admin dengan kode ${esc(b.kode)}.</p></div>`;
     else if (eff === "KEDALUWARSA") body += `<div class="panel"><h3>${icon("timer_off")} Permintaan kedaluwarsa</h3><p class="muted center">Admin belum sempat memproses sampai batas waktu. Kamu bisa mengajukan lagi.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
     if (eff === "MENUNGGU_VERIFIKASI") body += `<div class="panel"><h3>${icon("fact_check")} Pembayaran sedang diverifikasi</h3><p class="muted center">Terima kasih! Admin sedang mencocokkan pembayaranmu. Tidak perlu bayar lagi.</p></div>`;
+
     if (eff === "TERKONFIRMASI" || eff === "CHECKED_IN") {
         body += `<div class="panel ok"><h3>${icon(eff === "CHECKED_IN" ? "sports_esports" : "verified")} ${eff === "CHECKED_IN" ? "Selamat bermain!" : "Booking terkonfirmasi"}</h3>`;
         if (eff === "TERKONFIRMASI") {
@@ -333,6 +339,7 @@ function renderDetail(secret, b, fresh, ui) {
         }
         body += `</div>`;
     }
+
     if (eff === "SELESAI") body += `<div class="panel center"><h3>${icon("celebration")} Terima kasih sudah main!</h3><p class="muted">Sampai ketemu lagi di ARAYA GAMESTATION.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
     if (eff === "DITOLAK") {
         body += `<div class="panel bad"><h3>${icon("cancel")} Belum bisa diproses</h3><p class="center">${esc(b.rejectReason || "Jadwal tidak tersedia.")}</p>
@@ -342,7 +349,8 @@ function renderDetail(secret, b, fresh, ui) {
     if (eff === "NO_SHOW") body += `<div class="panel bad"><h3>${icon("person_off")} Tidak datang</h3><p class="muted center">${esc(ST.policy)}</p></div>`;
     if (b.payNote && eff === "MENUNGGU_BAYAR") body += `<div class="banner warn">${icon("report")}<span>Catatan admin: ${esc(b.payNote)}</span></div>`;
 
-    const money = b.total ? `<div class="kv"><span>Total</span><b>${rupiah(b.total)}</b></div><div class="kv"><span>DP${b.dpMethod === "CASH" ? " (Cash)" : ""}</span><b>${rupiah(b.dpDue)}</b></div>${b.dpPaid ? `<div class="kv"><span>DP diterima</span><b class="okc">${rupiah(b.dpPaid)}</b></div>` : ""}` : b.estTotal ? `<div class="kv"><span>Estimasi total</span><b>${rupiah(b.estTotal)}</b></div>` : "";
+    const method = b.dpMethod === "CASH" ? "Cash" : b.dpMethod === "QRIS" ? "QRIS" : "-";
+    const money = b.total ? `<div class="kv"><span>Total</span><b>${rupiah(b.total)}</b></div><div class="kv"><span>Metode DP</span><b>${method}</b></div><div class="kv"><span>DP${b.dpMethod === "CASH" ? " (Cash)" : ""}</span><b>${rupiah(b.dpDue)}</b></div>${b.dpPaid ? `<div class="kv"><span>DP diterima</span><b class="okc">${rupiah(b.dpPaid)}</b></div>` : ""}` : b.estTotal ? `<div class="kv"><span>Estimasi total</span><b>${rupiah(b.estTotal)}</b></div>` : "";
     const canCancel = ["PENDING", "MENUNGGU_BAYAR"].includes(eff);
 
     view.innerHTML = `<div class="detail-head"><a href="#/" class="btn btn-ghost btn-sm">${icon("arrow_back", 16)} Beranda</a>${pill(eff)}</div>
@@ -391,6 +399,12 @@ function renderDetail(secret, b, fresh, ui) {
     if ($("#sender")) { $("#sender").value = ui.sender; $("#sender").addEventListener("input", e => { ui.sender = e.target.value; }); }
     $("#proofFile")?.addEventListener("change", async e => {
         const f = e.target.files[0]; if (!f) return;
+        if (ui.proof) {
+            if (!await confirmBox("Ganti Bukti?", "Bukti pembayaran sebelumnya akan diganti. Lanjutkan?", "Ya, Ganti")) {
+                e.target.value = "";
+                return;
+            }
+        }
         try { ui.proof = await compressImage(f); const im = $("#proofPrev"); im.src = ui.proof; im.hidden = false; } catch (x) { toast("Gambar tidak bisa dibaca", "error"); }
     });
     $("#paidBtn")?.addEventListener("click", async e => {
