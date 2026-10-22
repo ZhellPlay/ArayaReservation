@@ -78,8 +78,7 @@ export const STATUS = {
     SELESAI: ["Selesai", "#9ca3af"],
     DITOLAK: ["Ditolak", "#ef4444"],
     KEDALUWARSA: ["Kedaluwarsa", "#9ca3af"],
-    DIBATALKAN: ["Dibatalkan", "#9ca3af"],
-    NO_SHOW: ["Tidak Datang", "#f87171"]
+    DIBATALKAN: ["Dibatalkan", "#9ca3af"]
 };
 export const HOLDING = ["MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"];
 export const pill = st => `<span class="pill" style="--c:${(STATUS[st] || ["", "#999"])[1]}">${esc((STATUS[st] || [st])[0])}</span>`;

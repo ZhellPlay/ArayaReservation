@@ -14,7 +14,7 @@ const mine = () => { try { return JSON.parse(localStorage.getItem("araya_mine") 
 const setMine = a => { try { localStorage.setItem("araya_mine", JSON.stringify(a.slice(0, 30))); } catch (e) { } };
 const remember = it => setMine([{ ...mine().find(x => x.s === it.s), ...it }, ...mine().filter(x => x.s !== it.s)]);
 const patchMine = (s, patch) => setMine(mine().map(x => x.s === s ? { ...x, ...patch } : x));
-const TERMINAL = ["SELESAI", "DITOLAK", "KEDALUWARSA", "DIBATALKAN", "NO_SHOW"];
+const TERMINAL = ["SELESAI", "DITOLAK", "KEDALUWARSA", "DIBATALKAN"];
 const forget = s => setMine(mine().filter(x => x.s !== s));
 const recentSubmits = () => { try { return JSON.parse(localStorage.getItem("araya_sub") || "[]").filter(t => Date.now() - t < H); } catch (e) { return []; } };
 
@@ -52,7 +52,7 @@ async function viewHome() {
         <div class="step-i"><b>4</b><span>Datang &amp; main</span></div>
     </div>
     <a class="btn btn-save btn-block" href="#/new">${icon("add_circle")} Booking Baru</a>
-    <div class="section-header" style="margin-top:var(--space-2xl)"><div class="section-title">${icon("confirmation_number", 22)} Booking Saya</div><span class="count-badge">${list.length}</span></div>
+    <div class="section-header" style="margin-top:34px"><div class="section-title">${icon("confirmation_number", 22)} Booking Saya</div><span class="count-badge">${list.length}</span></div>
     <div class="booking-grid" id="myList">${list.length ? "" : `<div class="empty-state"><span class="material-icons-round">event_busy</span><p>Belum ada booking di perangkat ini</p></div>`}</div>
     <div class="row-btns" style="margin-top:32px; justify-content: center;">
         <a class="btn btn-ghost" href="#/find">${icon("search")} Cari Booking (Link Hilang)</a>
@@ -82,7 +82,7 @@ function cardInner(b, st) {
       <div class="detail-item">${icon("event", 16)}<span class="val">${esc(b.tanggal ? fmtDate(b.tanggal, false) : "")} · ${esc(b.jamMulai || b.jam || "")}</span></div>
     </div>
     <div class="divider"></div>
-    <div class="card-foot">
+    <div class="action-buttons" style="justify-content: space-between; align-items: center;">
         <span class="btn btn-ghost btn-sm" style="pointer-events:none">${icon("visibility", 14)} Lihat Detail</span>
         <button class="btn btn-delete btn-sm" data-forget title="Hapus dari perangkat ini">${icon("close", 14)}</button>
     </div>`;
@@ -300,7 +300,7 @@ function renderDetail(secret, b, fresh, ui) {
         const cash = b.dpMethod === "CASH";
         body += `<div class="panel pay"><h3>${icon("payments")} Bayar DP sebelum waktu habis</h3>
           <div class="countdown" data-cd="${b.payDeadline}">${fmtCountdown(b.payDeadline - now())}</div><p class="muted center">Batas bayar: ${esc(fmtDT(b.payDeadline))} WITA</p>`;
-
+        
         if (cash) {
             body += `<div class="kv total"><span>DP Cash</span><b>${rupiah(b.dpDue)}</b></div>
             <p class="center">Silakan menuju kasir untuk melakukan pembayaran.</p>
@@ -325,7 +325,7 @@ function renderDetail(secret, b, fresh, ui) {
     if (eff === "KEDALUWARSA" && b.status === "MENUNGGU_BAYAR") body += `<div class="panel"><h3>${icon("timer_off")} Waktu pembayaran habis</h3><p class="muted center">Slot dilepas. Kalau kamu <b>sudah terlanjur transfer</b>, segera hubungi admin dengan kode ${esc(b.kode)}.</p></div>`;
     else if (eff === "KEDALUWARSA") body += `<div class="panel"><h3>${icon("timer_off")} Permintaan kedaluwarsa</h3><p class="muted center">Admin belum sempat memproses sampai batas waktu. Kamu bisa mengajukan lagi.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
     if (eff === "MENUNGGU_VERIFIKASI") body += `<div class="panel"><h3>${icon("fact_check")} Pembayaran sedang diverifikasi</h3><p class="muted center">Terima kasih! Admin sedang mencocokkan pembayaranmu. Tidak perlu bayar lagi.</p></div>`;
-
+    
     if (eff === "TERKONFIRMASI" || eff === "CHECKED_IN") {
         body += `<div class="panel ok"><h3>${icon(eff === "CHECKED_IN" ? "sports_esports" : "verified")} ${eff === "CHECKED_IN" ? "Selamat bermain!" : "Booking terkonfirmasi"}</h3>`;
         if (eff === "TERKONFIRMASI") {
@@ -339,14 +339,13 @@ function renderDetail(secret, b, fresh, ui) {
         }
         body += `</div>`;
     }
-
+    
     if (eff === "SELESAI") body += `<div class="panel center"><h3>${icon("celebration")} Terima kasih sudah main!</h3><p class="muted">Sampai ketemu lagi di ARAYA GAMESTATION.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
     if (eff === "DITOLAK") {
         body += `<div class="panel bad"><h3>${icon("cancel")} Belum bisa diproses</h3><p class="center">${esc(b.rejectReason || "Jadwal tidak tersedia.")}</p>
         <button class="btn btn-save btn-block" id="retryBtn">${icon("refresh")} Sesuaikan & Ajukan Ulang</button></div>`;
     }
     if (eff === "DIBATALKAN") body += `<div class="panel"><h3>${icon("block")} Booking dibatalkan</h3></div>`;
-    if (eff === "NO_SHOW") body += `<div class="panel bad"><h3>${icon("person_off")} Tidak datang</h3><p class="muted center">${esc(ST.policy)}</p></div>`;
     if (b.payNote && eff === "MENUNGGU_BAYAR") body += `<div class="banner warn">${icon("report")}<span>Catatan admin: ${esc(b.payNote)}</span></div>`;
 
     const method = b.dpMethod === "CASH" ? "Cash" : b.dpMethod === "QRIS" ? "QRIS" : "-";
