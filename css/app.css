@@ -225,7 +225,6 @@ label.check input[type="checkbox"] { margin-top: 1px; }
 .modal-card.wide > p { text-align: left; }
 .modal-card.wide .form-grid { margin: var(--space-md) 0; }
 
-/* Penyesuaian Divider Text untuk Scan QR */
 .divider-text {
     display: flex;
     align-items: center;
@@ -255,7 +254,8 @@ label.check input[type="checkbox"] { margin-top: 1px; }
 
 .proof-img { max-width: 100%; max-height: 50vh; max-height: 50dvh; border: 1px solid var(--border-subtle); display: block; margin: var(--space-md) auto; }
 
-.set-sec { margin-bottom: var(--space-lg); }
+.set-sec { margin: 0; }
+.set-save { margin: 0 0 var(--space-xl); }
 .set-sec > summary {
     cursor: pointer; font-weight: 700; font-size: 16px; padding: var(--space-md) var(--space-xs);
     list-style: none; display: flex; align-items: center; gap: var(--space-md);
@@ -341,7 +341,10 @@ label.check input[type="checkbox"] { margin-top: 1px; }
     .tab .badge { position: absolute; top: 3px; right: 3px; padding: 0 6px; font-size: 10px; }
 }
 
-@media (max-width: 480px) {
-    .scan-row { gap: var(--space-sm); }
-    .scan-row .btn { padding: 0 14px; font-size: 13px; }
+.list-info { margin-bottom: var(--space-lg); display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; }
+.card-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); }
+
+@media (pointer: coarse) {
+    .btn { min-height: 44px; }
+    .btn-sm { min-height: 40px; }
 }
