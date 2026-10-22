@@ -104,7 +104,7 @@ export const DEFAULT_SETTINGS = {
     adminWA: "", holidays: [], policy: "DP hangus jika batal setelah pembayaran atau tidak datang.",
     templates: {
         approve: "Halo {nama} 👋\nBooking kamu di ARAYA GAMESTATION {lokasi} ({room}) pada {tanggal}, jam {jam} sudah DISETUJUI ✅\n\nSilakan bayar DP {nominal} sebelum {deadline}, lalu upload bukti di link ini:\n{link}\n\nKode booking: {kode}",
-        approveCash: "Halo {nama} 👋\nBooking kamu di ARAYA GAMESTATION {lokasi} ({room}) pada {tanggal}, jam {jam} sudah DISETUJUI ✅\n\nDP {nominal} dibayar TUNAI di tempat sebelum {deadline}.\nDetail booking: {link}\n\nKode booking: {kode}",
+        approveCash: "Halo {nama} 👋\nBooking kamu di ARAYA GAMESTATION {lokasi} ({room}) pada {tanggal}, jam {jam} sudah DISETUJUI ✅\n\nSilakan bayar DP Cash atau Lunas langsung di kasir sebelum {deadline}.\nDetail booking: {link}\n\nKode booking: {kode}",
         reject: "Halo {nama}, mohon maaf booking kamu ({room}, {tanggal} {jam}) belum bisa kami proses.\nAlasan: {alasan}\nKamu bisa booking ulang di jam lain: {site}",
         remind: "Halo {nama}, pengingat: DP {nominal} untuk booking {room} ({tanggal} {jam}) belum kami terima. Batas bayar {deadline}.\n{link}",
         confirmed: "Halo {nama}, pembayaran DP sudah kami terima ✅\nSampai jumpa {tanggal} jam {jam} di {lokasi} ({room}). Tunjukkan QR di link ini saat datang:\n{link}\nKode: {kode}"
@@ -163,6 +163,17 @@ export function confirmBox(title, msg, ok = "Ya", danger = false) {
     });
 }
 
+export function promptBox(title, msg, value = "", ok = "Kirim") {
+    return new Promise(res => {
+        const m = modal(`<div class="modal-icon"><span class="material-icons-round">edit_note</span></div><h3>${esc(title)}</h3><p>${esc(msg)}</p>
+        <div class="form-group"><textarea id="pbIn" rows="3" maxlength="200">${esc(value)}</textarea></div>
+        <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-save" id="pbOk" style="flex:0 0 auto;padding:12px 22px">${esc(ok)}</button></div>`, { sticky: true, wide: false });
+        const inp = $("#pbIn", m.el); inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
+        $$("[data-close]", m.el).forEach(b => b.addEventListener("click", () => res(null)));
+        $("#pbOk", m.el).addEventListener("click", () => { const v = inp.value.trim(); m.close(); res(v); });
+    });
+}
+
 export function setBusy(btn, on, text) {
     if (on) { btn.dataset.o = btn.innerHTML; btn.disabled = true; btn.classList.add("btn-loading"); if (text) btn.textContent = text; }
     else { btn.disabled = false; btn.classList.remove("btn-loading"); if (btn.dataset.o) btn.innerHTML = btn.dataset.o; }
@@ -177,16 +188,6 @@ function copyBox(t) {
     const inp = $("#cpIn", m.el); inp.focus(); inp.select();
 }
 
-export function promptBox(title, msg, value = "", ok = "Kirim") {
-    return new Promise(res => {
-        const m = modal(`<div class="modal-icon"><span class="material-icons-round">edit_note</span></div><h3>${esc(title)}</h3><p>${esc(msg)}</p>
-        <div class="form-group"><textarea id="pbIn" rows="3" maxlength="200">${esc(value)}</textarea></div>
-        <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-save" id="pbOk" style="flex:0 0 auto;padding:12px 22px">${esc(ok)}</button></div>`, { sticky: true, wide: false });
-        const inp = $("#pbIn", m.el); inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
-        $$("[data-close]", m.el).forEach(b => b.addEventListener("click", () => res(null)));
-        $("#pbOk", m.el).addEventListener("click", () => { const v = inp.value.trim(); m.close(); res(v); });
-    });
-}
 export const icon = (n, size = 18) => `<span class="material-icons-round" style="font-size:${size}px">${n}</span>`;
 
 export function qrSvg(text) {

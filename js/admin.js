@@ -210,12 +210,19 @@ function cardHTML(b, i = 0) {
     const clash = isOpen(b.status) && S.bookings.some(o => o.id !== b.id && o.lokasi === b.lokasi && o.room === b.room && ["TERKONFIRMASI", "CHECKED_IN", "MENUNGGU_VERIFIKASI"].includes(o.status) && ["TERKONFIRMASI", "CHECKED_IN", "MENUNGGU_VERIFIKASI"].includes(b.status) && b.startMs < o.endMs && b.endMs > o.startMs);
     let money = "";
     if (b.total) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Total ${rupiah(b.total)} · DP ${rupiah(b.dpDue)} ${b.dpPaid ? `<b class="okc">✔ diterima ${rupiah(b.dpPaid)}</b>` : b.payAmount && b.dpMethod === "QRIS" ? `(transfer ${rupiah(b.payAmount)})` : ""}</span></div>`;
-    else if (b.estTotal) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Estimasi ${rupiah(b.estTotal)}${b.cashDp ? " · minta DP tunai" : ""}</span></div>`;
+    else if (b.estTotal) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Estimasi ${rupiah(b.estTotal)}${b.cashDp ? " · minta DP Cash" : ""}</span></div>`;
     const A = [], id = `data-id="${b.id}"`, bt = (act, cls, ic, txt) => `<button class="btn ${cls}" data-act="${act}" ${id}>${icon(ic, 15)}${txt}</button>`;
     if (st === "PENDING") A.push(bt("approve", "btn-ok", "check", "Setujui"), bt("reject", "btn-delete", "close", "Tolak"));
     if (st === "MENUNGGU_BAYAR") A.push(bt("remind", "btn-wa", "chat", "Ingatkan"), bt("cancel", "btn-delete", "block", "Batalkan"));
-    if (st === "MENUNGGU_VERIFIKASI") A.push(bt("verify", "btn-ok", "fact_check", "Verifikasi"), bt("receive", "btn-ghost", "payments", "Terima Tunai"));
-    if (st === "TERKONFIRMASI") { A.push(bt("checkin", "btn-ok", "login", b.tipe === "BLOK" ? "Mulai" : "Check-in")); if (now() > b.startMs + S.st.noShowGraceMin * 60000) A.push(bt("noshow", "btn-delete", "person_off", "Tidak datang")); }
+    if (st === "MENUNGGU_VERIFIKASI") A.push(bt("verify", "btn-ok", "fact_check", "Verifikasi"), bt("cancel", "btn-delete", "block", "Batalkan"));
+    if (st === "TERKONFIRMASI") {
+        if (b.dpMethod === "CASH" && !b.dpPaid) {
+            A.push(bt("receive", "btn-ok", "payments", "Verifikasi Cash"), bt("cancel", "btn-delete", "block", "Batalkan"));
+        } else {
+            A.push(bt("checkin", "btn-ok", "login", b.tipe === "BLOK" ? "Mulai" : "Check-in"));
+            if (now() > b.startMs + S.st.noShowGraceMin * 60000) A.push(bt("noshow", "btn-delete", "person_off", "Tidak datang"));
+        }
+    }
     if (st === "CHECKED_IN") A.push(bt("finish", "btn-warn", "stop_circle", b.tipe === "BLOK" ? "Buka kembali" : "Selesai"));
     A.push(bt("detail", "btn-ghost", "more_horiz", "Detail"));
     return `<div class="booking-card${hot}" style="animation-delay:${Math.min(i, 8) * .04}s"><div class="booking-card-header"><h3>${esc(b.nama || "-")}</h3>${pill(st)}</div>
@@ -350,11 +357,11 @@ function approveModal(b) {
       <p><b>${esc(b.nama)}</b> · ${esc(b.lokasi)} ${esc(b.room)}<br>${esc(fmtDate(b.tanggal))}, ${esc(rangeTxt(b))}</p>
       ${hard.length ? `<div class="banner warn">${icon("warning")}<span>Bentrok dengan: ${hard.map(o => esc(o.nama) + " " + rangeTxt(o)).join(", ")}. Sistem akan menolak.</span></div>` : ""}
       ${rivals.length ? `<div class="banner warn">${icon("groups")}<span>Ada ${rivals.length} permintaan lain di jam ini: ${rivals.map(o => esc(o.nama) + " " + rangeTxt(o)).join(", ")}. Menyetujui satu akan menahan slot.</span></div>` : ""}
-      ${b.cashDp ? `<div class="banner ok">${icon("info")}<span>Pelanggan minta DP tunai.</span></div>` : ""}
+      ${b.cashDp ? `<div class="banner ok">${icon("info")}<span>Pelanggan minta bayar Cash.</span></div>` : ""}
       <div class="form-grid">
         <div class="form-group"><label>Total (Otomatis)</label><input value="${rupiah(p.total)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
         <div class="form-group"><label>DP (${S.st.dpPercent}%)</label><input value="${rupiah(p.dp)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
-        <div class="form-group"><label>Metode DP</label><select id="aMethod" disabled style="opacity:0.7; cursor:not-allowed;"><option value="QRIS" ${cashDefault ? "" : "selected"}>QRIS</option><option value="CASH" ${cashDefault ? "selected" : ""}>Tunai di tempat</option></select></div>
+        <div class="form-group"><label>Metode DP</label><select id="aMethod" disabled style="opacity:0.7; cursor:not-allowed;"><option value="QRIS" ${cashDefault ? "" : "selected"}>QRIS</option><option value="CASH" ${cashDefault ? "selected" : ""}>Cash di tempat</option></select></div>
         <div class="form-group"><label>Batas bayar (WITA)</label><input type="datetime-local" id="aDead" value="${witaDateTimeInput(defDeadline)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
       </div>
       <label class="check" style="margin-top:8px"><input type="checkbox" id="aChk"><span>Saya sudah memastikan room <b>kosong</b> di jam ini (termasuk walk-in yang sedang main).</span></label>
@@ -367,8 +374,11 @@ function approveModal(b) {
         if (!deadline || deadline <= now()) return toast("Batas bayar harus di masa depan", "error");
         const payAmount = p.dp;
         setBusy(btn, true, "Memproses…");
-        const add = addOf(b, "MENUNGGU_BAYAR", deadline), patch = { status: "MENUNGGU_BAYAR", total: p.total, dpDue: p.dp, dpMethod: method, payAmount, payDeadline: deadline, approvedAt: now(), payNote: "" };
-        const ok = await run(() => changeStatus(b, patch, { add }), "Disetujui, slot ditahan");
+        const isCash = method === "CASH";
+        const add = addOf(b, isCash ? "TERKONFIRMASI" : "MENUNGGU_BAYAR", deadline);
+        const patch = { status: isCash ? "TERKONFIRMASI" : "MENUNGGU_BAYAR", total: p.total, dpDue: p.dp, dpMethod: method, payAmount: isCash ? 0 : p.dp, payDeadline: isCash ? null : deadline, approvedAt: now(), payNote: "" };
+        
+        const ok = await run(() => changeStatus(b, patch, { add }), "Disetujui");
         if (ok) { m.close(); waPrompt({ ...b, ...patch }, method === "CASH" ? "approveCash" : "approve", "Kabari pelanggan"); } else setBusy(btn, false);
     };
 }
@@ -403,32 +413,52 @@ async function verifyModal(b) {
 }
 
 function receiveModal(b) {
-    const m = modal(`<h3>${icon("payments")} Terima DP</h3><p>${esc(b.nama)} · DP seharusnya ${rupiah(b.dpDue)}</p>
+    const m = modal(`<h3>${icon("payments")} Verifikasi Cash</h3><p>${esc(b.nama)} · Total ${rupiah(b.total)} / DP ${rupiah(b.dpDue)}</p>
       <div class="form-grid"><div class="form-group"><label>Nominal diterima</label><input id="dNom" data-money inputmode="numeric" value="${fmtNum(b.dpDue)}"></div>
-      <div class="form-group"><label>Cara</label><select id="dMet"><option value="CASH" ${b.dpMethod === "CASH" ? "selected" : ""}>Tunai</option><option value="QRIS" ${b.dpMethod === "QRIS" ? "selected" : ""}>QRIS / transfer</option></select></div></div>
+      <div class="form-group"><label>Cara</label><select id="dMet"><option value="CASH" ${b.dpMethod === "CASH" ? "selected" : ""}>Cash</option><option value="QRIS" ${b.dpMethod === "QRIS" ? "selected" : ""}>QRIS / transfer</option></select></div></div>
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-ok" id="dGo">Konfirmasi</button></div>`);
     $("#dGo", m.el).onclick = async () => {
         const nom = parseNum($("#dNom", m.el).value); if (!nom) return toast("Isi nominal", "error");
-        const patch = { status: "TERKONFIRMASI", dpPaid: nom, dpPaidMethod: $("#dMet", m.el).value, dpPaidAt: now(), verifiedAt: now() };
-        if (await run(async () => { await changeStatus(b, patch, { add: addOf(b, "TERKONFIRMASI") }); try { await deleteDoc(doc(db, "proofs", b.id)); } catch (e) { } }, "DP tercatat")) { m.close(); waPrompt({ ...b, ...patch }, "confirmed", "Kabari pelanggan"); }
+        const patch = { status: "CHECKED_IN", dpPaid: nom, dpPaidMethod: $("#dMet", m.el).value, dpPaidAt: now(), checkedInAt: now(), verifiedAt: now() };
+        if (await run(async () => { await changeStatus(b, patch, { add: addOf(b, "CHECKED_IN") }); try { await deleteDoc(doc(db, "proofs", b.id)); } catch (e) { } }, "Cash diverifikasi, selamat bermain!")) { m.close(); }
     };
 }
 
 function detailModal(b) {
     const st = eff(b), r = roomCfg(S.st, b.lokasi, b.room), extra = r ? Math.max(0, b.orang - r.baseCap) : 0;
+    
+    let actionHtml = "";
+    if (["MENUNGGU_BAYAR", "MENUNGGU_VERIFIKASI"].includes(st)) {
+        actionHtml = "";
+    } else if (["SELESAI", "DITOLAK", "DIBATALKAN", "KEDALUWARSA", "NO_SHOW"].includes(st)) {
+        actionHtml = `<div class="row-btns" style="justify-content: center;"><button class="btn btn-delete" id="dDel">${icon("delete", 15)} Hapus</button></div>`;
+    } else {
+        actionHtml = `<div class="row-btns">
+            ${st === 'PENDING' ? `<button class="btn btn-ok" id="dApp">${icon("check", 15)} Setujui</button><button class="btn btn-delete" id="dRej">${icon("close", 15)} Tolak</button>` : ''}
+            ${st === 'TERKONFIRMASI' && b.dpMethod === "CASH" && !b.dpPaid ? `<button class="btn btn-ok" id="dVCash">${icon("payments", 15)} Verifikasi Cash</button>` : ''}
+            ${['TERKONFIRMASI', 'CHECKED_IN'].includes(st) ? `<button class="btn btn-ghost" id="dEdit">${icon("edit", 15)} Edit</button><button class="btn btn-ghost" id="dLink">${icon("link", 15)} Salin link</button>` : ''}
+            ${b.wa && !['MENUNGGU_BAYAR', 'MENUNGGU_VERIFIKASI'].includes(st) ? `<button class="btn btn-wa" id="dWa">${icon("chat", 15)} WA</button>` : ''}
+            <button class="btn btn-delete" id="dDel">${icon("delete", 15)} Hapus</button>
+        </div>`;
+    }
+
     const m = modal(`<h3>${esc(b.nama)} ${pill(st)}</h3>
       <div class="kv"><span>Kode</span><b class="mono">${esc(b.kode)}</b></div><div class="kv"><span>Lokasi / Room</span><b>${esc(b.lokasi)} · ${esc(b.room)}</b></div>
       <div class="kv"><span>Waktu</span><b>${esc(fmtDate(b.tanggal))}<br>${esc(rangeTxt(b))} (${b.durasi} jam)</b></div>
       <div class="kv"><span>Orang / Mic</span><b>${b.orang}${extra ? ` (+${extra})` : ""} / ${b.mic || 0}</b></div><div class="kv"><span>WA</span><b>${esc(b.wa || "-")}</b></div>
       ${b.total ? `<div class="kv"><span>Total / DP</span><b>${rupiah(b.total)} / ${rupiah(b.dpDue)}</b></div>` : ""}${b.dpPaid ? `<div class="kv"><span>DP diterima</span><b class="okc">${rupiah(b.dpPaid)} (${esc(b.dpPaidMethod || "")})</b></div>` : ""}
-      ${b.rejectReason ? `<div class="kv"><span>Alasan tolak</span><b>${esc(b.rejectReason)}</b></div>` : ""}${b.catatan ? `<div class="kv"><span>Catatan</span><b>${esc(b.catatan)}</b></div>` : ""}
-      <div class="row-btns"><button class="btn btn-ghost" id="dEdit">${icon("edit", 15)} Edit / Geser jadwal</button><button class="btn btn-ghost" id="dLink">${icon("link", 15)} Salin link</button>
-      ${b.wa ? `<button class="btn btn-wa" id="dWa">${icon("chat", 15)} WA</button>` : ""}<button class="btn btn-delete" id="dDel">${icon("delete", 15)} Hapus</button></div>
+      ${b.rejectReason ? `<div class="kv"><span>Alasan tolak</span><b class="center">${esc(b.rejectReason)}</b></div>` : ""}${b.catatan ? `<div class="kv"><span>Catatan</span><b>${esc(b.catatan)}</b></div>` : ""}
+      ${actionHtml}
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Tutup</button></div>`);
-    $("#dEdit", m.el).onclick = () => { m.close(); editModal(b); };
-    $("#dLink", m.el).onclick = () => copyText(bookingLink(b.id));
+
+    $("#dApp", m.el)?.addEventListener("click", () => { m.close(); approveModal(b); });
+    $("#dRej", m.el)?.addEventListener("click", () => { m.close(); rejectModal(b); });
+    $("#dEdit", m.el)?.addEventListener("click", () => { m.close(); editModal(b); });
+    $("#dLink", m.el)?.addEventListener("click", () => copyText(bookingLink(b.id)));
     $("#dWa", m.el)?.addEventListener("click", () => sendWA(b, st === "TERKONFIRMASI" ? "confirmed" : st === "MENUNGGU_BAYAR" ? (b.dpMethod === "CASH" ? "approveCash" : "approve") : "confirmed"));
-    $("#dDel", m.el).onclick = async () => {
+    $("#dVCash", m.el)?.addEventListener("click", () => { m.close(); receiveModal(b); });
+
+    $("#dDel", m.el)?.addEventListener("click", async () => {
         if (!await confirmBox("Hapus permanen?", "Data booking ini dihapus dan tidak bisa dikembalikan.", "Ya, hapus", true)) return;
         m.close();
         run(async () => {
@@ -437,7 +467,7 @@ function detailModal(b) {
             try { if (b.kode && b.wa) await deleteDoc(doc(db, "lookups", await lookupId(b.kode, b.wa))); } catch (e) { }
             await deleteDoc(refOf(b));
         }, "Dihapus");
-    };
+    });
 }
 
 function editModal(b) {

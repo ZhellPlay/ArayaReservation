@@ -133,7 +133,7 @@ function viewForm() {
       <div class="form-group"><label>Tambahan Mic</label>${stepper("mic", 0, 20, 0)}</div>
       <div class="form-group full-width"><small class="hint" id="f-orangHint"></small></div>
       <div class="form-group full-width"><label>Jam Mulai <span class="muted" id="f-jamLabel"></span></label><div id="f-slots" class="chip-grid"><p class="hint">Pilih lokasi, room, dan tanggal dulu.</p></div></div>
-      <div class="form-group full-width"><label class="check"><input type="checkbox" id="f-cash"><span>Saya ingin bayar DP <b>tunai di tempat</b> <small class="muted">(perlu persetujuan admin)</small></span></label></div>
+      <div class="form-group full-width"><label class="check"><input type="checkbox" id="f-cash"><span>Saya ingin bayar DP / Lunas dengan <b>Cash</b> di tempat <small class="muted">(perlu persetujuan admin)</small></span></label></div>
       <div class="form-group full-width"><label>Catatan</label><textarea id="f-catatan" rows="2" maxlength="300" placeholder="Opsional" style="resize:vertical"></textarea></div>
       <div class="form-group full-width"><div class="est" id="f-est"></div></div>
     </div>
@@ -294,13 +294,13 @@ function renderDetail(secret, b, fresh, ui) {
 
     if (fresh) body += `<div class="banner ok">${icon("check_circle")}<div><b>Permintaan terkirim!</b><br>Simpan link halaman ini. Kamu juga bisa kembali kapan saja pakai <b>kode ${esc(b.kode)}</b> + nomor WA.</div></div>`;
 
-    if (eff === "PENDING") body += `<div class="panel"><h3>${icon("hourglass_top")} Menunggu konfirmasi admin</h3><p class="muted">Slot belum terkunci. Admin akan mengecek kondisi room, lalu kamu akan dikabari lewat WhatsApp. Halaman ini otomatis berubah saat ada kabar.</p></div>`;
+    if (eff === "PENDING") body += `<div class="panel"><h3>${icon("hourglass_top")} Menunggu konfirmasi admin</h3><p class="muted center">Slot belum terkunci. Admin akan mengecek kondisi room, lalu kamu akan dikabari lewat WhatsApp. Halaman ini otomatis berubah saat ada kabar.</p></div>`;
 
     if (eff === "MENUNGGU_BAYAR") {
         const cash = b.dpMethod === "CASH";
         body += `<div class="panel pay"><h3>${icon("payments")} Bayar DP sebelum waktu habis</h3>
           <div class="countdown" data-cd="${b.payDeadline}">${fmtCountdown(b.payDeadline - now())}</div><p class="muted center">Batas bayar: ${esc(fmtDT(b.payDeadline))} WITA</p>`;
-        if (cash) body += `<div class="kv total"><span>DP tunai</span><b>${rupiah(b.dpDue)}</b></div><p>Bayar DP <b>tunai di tempat</b> sebelum batas waktu. Admin akan mengubah status booking setelah menerima.</p>`;
+        if (cash) body += `<div class="kv total"><span>DP Cash</span><b>${rupiah(b.dpDue)}</b></div><p>Bayar DP <b>Cash di tempat</b> sebelum batas waktu. Admin akan mengubah status booking setelah menerima.</p>`;
         else {
             const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "";
             if (q && q.payload) { try { qr = qrSvg(makeDynamic(q.payload, b.payAmount)); } catch (e) { qr = ""; } }
@@ -317,25 +317,32 @@ function renderDetail(secret, b, fresh, ui) {
         }
         body += `</div>`;
     }
-    if (eff === "KEDALUWARSA" && b.status === "MENUNGGU_BAYAR") body += `<div class="panel"><h3>${icon("timer_off")} Waktu pembayaran habis</h3><p class="muted">Slot dilepas. Kalau kamu <b>sudah terlanjur transfer</b>, segera hubungi admin dengan kode ${esc(b.kode)}.</p></div>`;
-    else if (eff === "KEDALUWARSA") body += `<div class="panel"><h3>${icon("timer_off")} Permintaan kedaluwarsa</h3><p class="muted">Admin belum sempat memproses sampai batas waktu. Kamu bisa mengajukan lagi.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
-    if (eff === "MENUNGGU_VERIFIKASI") body += `<div class="panel"><h3>${icon("fact_check")} Pembayaran sedang diverifikasi</h3><p class="muted">Terima kasih! Admin sedang mencocokkan pembayaranmu. Tidak perlu bayar lagi.</p></div>`;
+    if (eff === "KEDALUWARSA" && b.status === "MENUNGGU_BAYAR") body += `<div class="panel"><h3>${icon("timer_off")} Waktu pembayaran habis</h3><p class="muted center">Slot dilepas. Kalau kamu <b>sudah terlanjur transfer</b>, segera hubungi admin dengan kode ${esc(b.kode)}.</p></div>`;
+    else if (eff === "KEDALUWARSA") body += `<div class="panel"><h3>${icon("timer_off")} Permintaan kedaluwarsa</h3><p class="muted center">Admin belum sempat memproses sampai batas waktu. Kamu bisa mengajukan lagi.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
+    if (eff === "MENUNGGU_VERIFIKASI") body += `<div class="panel"><h3>${icon("fact_check")} Pembayaran sedang diverifikasi</h3><p class="muted center">Terima kasih! Admin sedang mencocokkan pembayaranmu. Tidak perlu bayar lagi.</p></div>`;
     if (eff === "TERKONFIRMASI" || eff === "CHECKED_IN") {
         body += `<div class="panel ok"><h3>${icon(eff === "CHECKED_IN" ? "sports_esports" : "verified")} ${eff === "CHECKED_IN" ? "Selamat bermain!" : "Booking terkonfirmasi"}</h3>`;
-        if (eff === "TERKONFIRMASI") body += `<p class="muted">Tunjukkan QR ini ke admin saat datang. Datang paling lambat ${ST.noShowGraceMin} menit setelah jam mulai.</p><div class="qr-box">${qrSvg(b.kode)}</div><div class="big-code">${esc(b.kode)}</div>`;
-        else body += `<p class="muted center">Sesi berjalan sampai ${esc(witaTime(b.endMs))}.</p>`;
+        if (eff === "TERKONFIRMASI") {
+            if (b.dpMethod === "CASH" && !b.dpPaid) {
+                body += `<div class="banner warn" style="margin-bottom: 12px;">${icon("info")}<span>Silakan bayar DP Cash (${rupiah(b.dpDue)}) atau Lunas (${rupiah(b.total)}) di kasir. Tunjukkan QR di bawah ini.</span></div>`;
+            }
+            body += `<p class="muted center">Tunjukkan QR ini ke admin saat datang. Datang paling lambat ${ST.noShowGraceMin} menit setelah jam mulai.</p><div class="qr-box">${qrSvg(b.kode)}</div><div class="big-code">${esc(b.kode)}</div>`;
+        } else {
+            body += `<p class="muted center">Sesi berjalan sampai ${esc(witaTime(b.endMs))}.</p>`;
+            body += `<div class="countdown" data-cd="${b.endMs}">${fmtCountdown(b.endMs - now())}</div>`;
+        }
         body += `</div>`;
     }
     if (eff === "SELESAI") body += `<div class="panel center"><h3>${icon("celebration")} Terima kasih sudah main!</h3><p class="muted">Sampai ketemu lagi di ARAYA GAMESTATION.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
     if (eff === "DITOLAK") {
-        body += `<div class="panel bad"><h3>${icon("cancel")} Belum bisa diproses</h3><p>${esc(b.rejectReason || "Jadwal tidak tersedia.")}</p>
+        body += `<div class="panel bad"><h3>${icon("cancel")} Belum bisa diproses</h3><p class="center">${esc(b.rejectReason || "Jadwal tidak tersedia.")}</p>
         <button class="btn btn-save btn-block" id="retryBtn">${icon("refresh")} Sesuaikan & Ajukan Ulang</button></div>`;
     }
     if (eff === "DIBATALKAN") body += `<div class="panel"><h3>${icon("block")} Booking dibatalkan</h3></div>`;
-    if (eff === "NO_SHOW") body += `<div class="panel bad"><h3>${icon("person_off")} Tidak datang</h3><p class="muted">${esc(ST.policy)}</p></div>`;
+    if (eff === "NO_SHOW") body += `<div class="panel bad"><h3>${icon("person_off")} Tidak datang</h3><p class="muted center">${esc(ST.policy)}</p></div>`;
     if (b.payNote && eff === "MENUNGGU_BAYAR") body += `<div class="banner warn">${icon("report")}<span>Catatan admin: ${esc(b.payNote)}</span></div>`;
 
-    const money = b.total ? `<div class="kv"><span>Total</span><b>${rupiah(b.total)}</b></div><div class="kv"><span>DP${b.dpMethod === "CASH" ? " (tunai)" : ""}</span><b>${rupiah(b.dpDue)}</b></div>${b.dpPaid ? `<div class="kv"><span>DP diterima</span><b class="okc">${rupiah(b.dpPaid)}</b></div>` : ""}` : b.estTotal ? `<div class="kv"><span>Estimasi total</span><b>${rupiah(b.estTotal)}</b></div>` : "";
+    const money = b.total ? `<div class="kv"><span>Total</span><b>${rupiah(b.total)}</b></div><div class="kv"><span>DP${b.dpMethod === "CASH" ? " (Cash)" : ""}</span><b>${rupiah(b.dpDue)}</b></div>${b.dpPaid ? `<div class="kv"><span>DP diterima</span><b class="okc">${rupiah(b.dpPaid)}</b></div>` : ""}` : b.estTotal ? `<div class="kv"><span>Estimasi total</span><b>${rupiah(b.estTotal)}</b></div>` : "";
     const canCancel = ["PENDING", "MENUNGGU_BAYAR"].includes(eff);
 
     view.innerHTML = `<div class="detail-head"><a href="#/" class="btn btn-ghost btn-sm">${icon("arrow_back", 16)} Beranda</a>${pill(eff)}</div>

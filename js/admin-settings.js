@@ -36,7 +36,7 @@ const lokBlock = (l, rms) => `<div class="lok-block" data-loksec="${esc(l)}">
 
 const TPL_NAMES = {
     approve: "Persetujuan (QRIS)",
-    approveCash: "Persetujuan (Tunai)",
+    approveCash: "Persetujuan (Cash)",
     reject: "Penolakan",
     remind: "Pengingat Pembayaran",
     confirmed: "Konfirmasi Pembayaran"
