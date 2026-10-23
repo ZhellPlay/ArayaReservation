@@ -1,6 +1,6 @@
 import { db, doc, getDoc, onSnapshot, writeBatch, serverTimestamp } from "./fb.js";
 import {
-    $, $$, esc, toast, confirmBox, setBusy, copyText, icon, rupiah, fmtNum, normWA, validWA, randSecret, genKode, normKode, lookupId,
+    $, $$, esc, toast, confirmBox, setBusy, copyText, icon, rupiah, fmtNum, parseNum, normWA, validWA, randSecret, genKode, normKode, lookupId,
     toMs, witaDate, witaTime, fmtDate, fmtDT, fmtCountdown, now, syncClock, pill, effStatus, mergeSettings, roomCfg, getEndMs,
     isHoliday, calcPrice, waLink, bookingLink, qrSvg, compressImage, downloadQrPng, startBackground
 } from "./lib.js";
@@ -492,6 +492,10 @@ function renderDetail(secret, b, fresh, ui, draw) {
 
         $("#manualDp")?.addEventListener("input", e => {
             ui.manualAmount = parseNum(e.target.value);
+            if (ui.qrGenerated && ui.qrAmount !== ui.manualAmount) {
+                draw();
+                return;
+            }
             const warn = $("#dpWarn");
             if (warn) {
                 if (ui.manualAmount > 0 && ui.manualAmount < d) {
@@ -502,12 +506,6 @@ function renderDetail(secret, b, fresh, ui, draw) {
                     warn.style.display = 'block';
                 } else {
                     warn.style.display = 'none';
-                }
-            }
-            if (ui.qrGenerated && ui.qrAmount !== ui.manualAmount) {
-                const warnBox = $("#payQrBox")?.previousElementSibling;
-                if (warnBox && warnBox.classList.contains("banner")) {
-                    warnBox.innerHTML = `<div class="banner warn" style="justify-content:center; flex-direction:column;">${icon("warning")}<span>Nominal berubah. QR di bawah ini masih menggunakan nominal <b>${rupiah(ui.qrAmount)}</b>. Klik tombol di atas untuk memperbarui.</span></div>`;
                 }
             }
         });
