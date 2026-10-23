@@ -339,7 +339,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
                         ${ui.manualAmount > 0 && ui.manualAmount < d ? `Minimal DP adalah ${rupiah(d)}` : ui.manualAmount > total ? `Maksimal adalah ${rupiah(total)} (Lunas)` : ''}
                     </small>
                 </div>
-                <button class="btn btn-ghost btn-block" type="button" id="btnGenQr" style="margin-bottom:16px;" ${(ui.manualAmount < d || ui.manualAmount > total) ? 'disabled' : ''}>${icon("qr_code_2")} Tampilkan QRIS</button>
+                <button class="btn btn-ghost btn-block" type="button" id="btnGenQr" style="margin-bottom:16px;">${icon("qr_code_2")} Tampilkan QRIS</button>
             ` : ''}
             `;
 
@@ -371,7 +371,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
                   <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia atau nominal tidak valid. Hubungi admin untuk cara bayar.</span></div>`}
                   <div class="proof"><label>Bukti pembayaran <small class="muted">(Wajib berupa screenshot)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" ${ui.proof ? "" : "hidden"} src="${ui.proof || ""}">
                   <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening" value="${ui.sender || ""}">
-                  <button class="btn btn-save btn-block" type="button" id="paidBtn" ${!isQrValid ? 'disabled' : ''}>${icon("task_alt")} Saya Sudah Bayar</button>
+                  <button class="btn btn-save btn-block" type="button" id="paidBtn">${icon("task_alt")} Saya Sudah Bayar</button>
                   <small class="muted">Tekan hanya setelah transfer berhasil. Admin akan mencocokkan dengan mutasi QRIS.</small></div>`;
             }
             body += `<button class="btn btn-ghost btn-sm" type="button" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
@@ -480,29 +480,17 @@ function renderDetail(secret, b, fresh, ui, draw) {
         $("#manualDp")?.addEventListener("input", e => {
             ui.manualAmount = parseNum(e.target.value);
             const warn = $("#dpWarn");
-            const btn = $("#btnGenQr");
-            
-            let isError = false;
-            if (ui.manualAmount > 0 && ui.manualAmount < d) {
-                warn.textContent = `Minimal DP adalah ${rupiah(d)}`;
-                warn.style.display = 'block';
-                isError = true;
-            } else if (ui.manualAmount > total) {
-                warn.textContent = `Maksimal adalah ${rupiah(total)} (Lunas)`;
-                warn.style.display = 'block';
-                isError = true;
-            } else {
-                warn.style.display = 'none';
-            }
-
-            if (btn) {
-                if (isError || ui.manualAmount === 0) {
-                    btn.setAttribute("disabled", "disabled");
+            if (warn) {
+                if (ui.manualAmount > 0 && ui.manualAmount < d) {
+                    warn.textContent = `Minimal DP adalah ${rupiah(d)}`;
+                    warn.style.display = 'block';
+                } else if (ui.manualAmount > total) {
+                    warn.textContent = `Maksimal adalah ${rupiah(total)} (Lunas)`;
+                    warn.style.display = 'block';
                 } else {
-                    btn.removeAttribute("disabled");
+                    warn.style.display = 'none';
                 }
             }
-
             if (ui.qrGenerated && ui.qrAmount !== ui.manualAmount) {
                 const warnBox = $("#payQrBox")?.previousElementSibling;
                 if (warnBox && warnBox.classList.contains("banner")) {
@@ -513,9 +501,12 @@ function renderDetail(secret, b, fresh, ui, draw) {
 
         $("#btnGenQr")?.addEventListener("click", () => {
             const val = parseNum($("#manualDp").value);
+            if (val < d) return toast(`Minimal DP adalah ${rupiah(d)}`, "error");
+            if (val > total) return toast(`Maksimal adalah ${rupiah(total)}`, "error");
             ui.qrGenerated = true;
             ui.qrAmount = val;
             draw();
+            setTimeout(() => document.querySelector("#payQrBox")?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
         });
 
         $("#proofFile")?.addEventListener("change", async e => {
