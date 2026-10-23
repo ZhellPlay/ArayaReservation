@@ -356,8 +356,12 @@ function renderDetail(secret, b, fresh, ui, draw) {
             const displayAmount = ui.payType === 'DP_MANUAL' ? ui.qrAmount : finalAmount;
             const isQrValid = displayAmount >= d && displayAmount <= total;
 
-            if (!ui.qrGenerated && ui.payType === 'DP_MANUAL') {
-                            } else {
+            const manualQrReady = ui.payType !== "DP_MANUAL" || (ui.qrGenerated && ui.qrAmount === ui.manualAmount && isQrValid);
+            if (!manualQrReady) {
+                if (ui.qrGenerated && ui.qrAmount !== ui.manualAmount) {
+                    body += `<div class="banner warn" style="justify-content:center;">${icon("warning")}<span>Nominal berubah. Tampilkan QRIS lagi untuk membuat QR dengan nominal terbaru.</span></div>`;
+                }
+            } else {
                 body += `<div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(displayAmount)}</div></div>`;
                 
                 const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "", errMsg = "";
@@ -508,14 +512,42 @@ function renderDetail(secret, b, fresh, ui, draw) {
             }
         });
 
-        $("#btnGenQr")?.addEventListener("click", () => {
-            const val = parseNum($("#manualDp").value);
-            if (val < d) return toast(`Minimal DP adalah ${rupiah(d)}`, "error");
-            if (val > total) return toast(`Maksimal adalah ${rupiah(total)}`, "error");
+        $("#btnGenQr")?.addEventListener("click", event => {
+            event.preventDefault();
+            const input = $("#manualDp");
+            if (!input) {
+                toast("Kolom nominal DP tidak ditemukan. Muat ulang halaman.", "error");
+                return;
+            }
+
+            const val = parseNum(input.value);
+            ui.manualAmount = val;
+
+            if (val < d) {
+                toast(`Minimal DP adalah ${rupiah(d)}`, "error");
+                input.focus();
+                return;
+            }
+            if (val > total) {
+                toast(`Maksimal adalah ${rupiah(total)}`, "error");
+                input.focus();
+                return;
+            }
+
             ui.qrGenerated = true;
             ui.qrAmount = val;
-            draw();
-            setTimeout(() => document.querySelector("#payQrBox")?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+            try {
+                draw();
+                const qrBox = document.querySelector("#payQrBox");
+                if (qrBox) {
+                    setTimeout(() => qrBox.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
+                }
+            } catch (error) {
+                ui.qrGenerated = false;
+                console.error("Gagal menampilkan QRIS:", error);
+                toast("QRIS gagal dibuat. Periksa QRIS merchant atau coba muat ulang halaman.", "error");
+                draw();
+            }
         });
 
         $("#proofFile")?.addEventListener("change", async e => {
@@ -533,7 +565,11 @@ function renderDetail(secret, b, fresh, ui, draw) {
         $("#paidBtn")?.addEventListener("click", async e => {
             const btn = e.currentTarget;
             const amtToPay = ui.payType === 'DP_MANUAL' ? ui.qrAmount : (ui.payType === 'LUNAS' ? total : d);
-            if (amtToPay < d || amtToPay > total) return toast(`Nominal harus antara ${rupiah(d)} dan ${rupiah(total)}`, "error");
+            if (ui.payType === "DP_MANUAL" && (!ui.qrGenerated || ui.qrAmount !== ui.manualAmount || !document.querySelector("#payQrBox svg"))) {
+                return toast("Tampilkan QRIS untuk nominal terbaru sebelum mengirim pembayaran.", "error");
+            }
+            if (!Number.isFinite(amtToPay) || amtToPay < d || amtToPay > total) return toast(`Nominal harus antara ${rupiah(d)} dan ${rupiah(total)}`, "error");
+            if (!document.querySelector("#payQrBox svg")) return toast("QRIS belum berhasil dibuat. Periksa QRIS merchant atau hubungi admin.", "error");
             if (!ui.proof) return toast("Wajib melampirkan bukti pembayaran (screenshot)!", "error");
             if (!await confirmBox("Kirim konfirmasi bayar?", "Pastikan transfer sudah berhasil sebelum melanjutkan.", "Kirim")) return;
             setBusy(btn, true, "Mengirim…");
