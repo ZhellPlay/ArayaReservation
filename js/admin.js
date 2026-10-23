@@ -616,6 +616,28 @@ function editModal(b) {
             catatan: $("#eCat", m.el).value.trim(),
             upd: serverTimestamp()
         };
+
+        // VALIDASI HARI LIBUR DI MODE EDIT
+        const hol = isHoliday(S.st, patch.lokasi, patch.tanggal);
+        if (hol) {
+            toast(`Di tanggal tersebut tutup karena ${hol.alasan ? hol.alasan : "ada acara"}. Mohon pilih tanggal lain.`, "error");
+            return; // Hentikan proses, modal tidak tertutup
+        }
+
+        // VALIDASI BENTROK DI MODE EDIT (Cek ke data lokal dulu)
+        const clash = S.bookings.find(o => 
+            o.id !== b.id && 
+            o.lokasi === patch.lokasi && 
+            o.room === patch.room && 
+            ["MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN", "MENUNGGU_BAYAR"].includes(o.status) &&
+            patch.startMs < o.endMs && patch.endMs > o.startMs
+        );
+
+        if (clash) {
+            toast(`Slot bentrok dengan booking ${clash.nama} (${clash.jamMulai} - ${witaTime(clash.endMs)}).`, "error");
+            return; // Hentikan proses, modal tidak tertutup
+        }
+
         if (!b.tipe || b.tipe === "ONLINE") {
             if (b.status === "PENDING") patch.estTotal = m_tot;
             else {
