@@ -584,7 +584,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
             if (!Number.isFinite(amtToPay) || amtToPay < d || amtToPay > total) return toast(`Nominal harus antara ${rupiah(d)} dan ${rupiah(total)}`, "error");
             if (!document.querySelector("#payQrBox svg")) return toast("QRIS belum berhasil dibuat. Periksa QRIS merchant atau hubungi admin.", "error");
             if (!ui.proof) return toast("Wajib melampirkan bukti pembayaran (screenshot)!", "error");
-            if (!await confirmBox("Kirim konfirmasi bayar?", "Pastikan transfer sudah berhasil sebelum melanjutkan.", "Kirim")) return;
+            if (!await confirmBox("Kirim konfirmasi bayar?", "Pastikan transfer telah berhasil. Harap unggah bukti transfer ASLI (bukan editan/AI). Pemalsuan bukti dapat dikenakan sanksi hukum.", "Kirim")) return;
             setBusy(btn, true, "Mengirim…");
             try {
                 const batch = writeBatch(db);

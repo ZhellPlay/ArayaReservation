@@ -220,7 +220,7 @@ function cardHTML(b, i = 0) {
         let info = "";
         if (b.dpPaid) info = `<b class="okc">✔ Diterima ${rupiah(b.dpPaid)} (${b.dpPaidMethod || b.dpMethod || "CASH"})</b>`;
         else if (b.payAmount) {
-            const typeStr = b.paymentType === "LUNAS" ? "Lunas" : b.paymentType === "DP_MANUAL" ? "DP Manual" : "DP";
+            const typeStr = b.paymentType === "LUNAS" ? "Lunas" : "DP";
             info = `(Klaim: ${typeStr} ${rupiah(b.payAmount)} via ${b.dpMethod || "QRIS"})`;
         }
         money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Total ${rupiah(b.total)} · DP ${rupiah(b.dpDue)} ${info}</span></div>`;
@@ -405,12 +405,16 @@ async function verifyModal(b) {
     
     const isCash = b.dpMethod === "CASH";
     const method = isCash ? "CASH" : "QRIS";
-    const tipe = b.paymentType === "LUNAS" ? "Lunas" : b.paymentType === "DP_MANUAL" ? "DP Manual" : "DP";
+    const tipe = b.paymentType === "LUNAS" ? "Lunas" : "DP";
     const nominal = b.payAmount || b.dpDue || 0;
     
     const receivedAmount = b.paymentType === "LUNAS" ? (b.total || nominal) : nominal;
-    const receivedLabel = isCash ? (b.paymentType === "LUNAS" ? "Nominal yang harusnya diterima:" : "Nominal minimal yang harusnya diterima:") : "Cari di mutasi / notifikasi merchant QRIS:";
-    const receivedNote = !isCash ? "Nominal harus PERSIS sama." : (b.paymentType === "LUNAS" ? "Pastikan sesuai." : "Pelanggan bisa membayar lebih dari nominal minimal ini.");
+    const receivedLabel = isCash ? (b.paymentType === "LUNAS" ? "Nominal yang harusnya diterima:" : "Nominal minimal yang harusnya diterima:") : "User klaim transfer sebesar:";
+    
+    // Kalimat yang sudah disesuaikan
+    const receivedNote = !isCash 
+        ? "PENTING: Cek detail bukti pembayaran (nama, no rek, nominal, dll). Pastikan tidak ada indikasi manipulasi dan pastikan bukti transfer asli." 
+        : (b.paymentType === "LUNAS" ? "Pastikan sesuai." : "Pelanggan bisa membayar lebih dari nominal minimal ini.");
     
     const btnNoText = isCash ? "Belum diterima" : "Belum masuk";
     const btnOkText = isCash ? "Sudah diterima" : "Sudah masuk";
@@ -515,7 +519,7 @@ function detailModal(b) {
     }
 
     const method = b.dpMethod === "CASH" ? "CASH" : b.dpMethod === "QRIS" ? "QRIS" : "-";
-    let payTypeStr = b.paymentType === "LUNAS" ? "Lunas" : b.paymentType === "DP_MANUAL" ? "DP Manual" : b.paymentType === "DP_MIN" ? "DP" : "-";
+    let payTypeStr = b.paymentType === "LUNAS" ? "Lunas" : "DP";
     
     let payInfo = "";
     if (b.payAmount) {
