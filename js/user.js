@@ -61,8 +61,12 @@ async function viewHome() {
     list.forEach((it, i) => {
         const card = document.createElement("div"); card.className = "booking-card"; card.style.animationDelay = i * .05 + "s";
         card.innerHTML = cardInner(it, it.st || null); box.appendChild(card);
-        card.addEventListener("click", e => {
-            if (e.target.closest("[data-forget]")) { forget(it.s); card.remove(); return; }
+        card.addEventListener("click", async e => {
+            const f = e.target.closest("[data-forget]");
+            if (f) {
+                if (!await confirmBox("Hapus dari perangkat?", "Data booking ini akan dihapus dari daftar di HP ini. Booking di server admin tidak terhapus.", "Ya, Hapus")) return;
+                forget(it.s); card.remove(); return;
+            }
             location.hash = "#/b/" + it.s;
         });
         if (TERMINAL.includes(it.st)) return;
@@ -76,6 +80,7 @@ async function viewHome() {
 }
 
 function cardInner(b, st) {
+    const isTerminal = TERMINAL.includes(st);
     return `<div class="booking-card-header"><h3>${esc(b.kode || "")}</h3>${st === "HILANG" ? `<span class="pill" style="--c:#9ca3af">Tidak ditemukan</span>` : st ? pill(st) : `<span class="pill" style="--c:#9ca3af">Memuat…</span>`}</div>
     <div class="booking-details">
       <div class="detail-item">${icon("location_on", 16)}<span class="val">${esc(b.lokasi)} - ${esc(b.room)}</span></div>
@@ -84,7 +89,7 @@ function cardInner(b, st) {
     <div class="divider"></div>
     <div class="action-buttons" style="justify-content: space-between; align-items: center;">
         <span class="btn btn-ghost btn-sm" style="pointer-events:none">${icon("visibility", 14)} Lihat Detail</span>
-        <button class="btn btn-delete btn-sm" data-forget title="Hapus dari perangkat ini">${icon("close", 14)}</button>
+        ${isTerminal ? `<button class="btn btn-delete btn-sm" data-forget>${icon("delete", 14)} Hapus</button>` : ""}
     </div>`;
 }
 
@@ -133,7 +138,6 @@ function viewForm() {
       <div class="form-group"><label>Tambahan Mic</label>${stepper("mic", 0, 20, 0)}</div>
       <div class="form-group full-width"><small class="hint" id="f-orangHint"></small></div>
       <div class="form-group full-width"><label>Jam Mulai <span class="muted" id="f-jamLabel"></span></label><div id="f-slots" class="chip-grid"><p class="hint">Pilih lokasi, room, dan tanggal dulu.</p></div></div>
-      <div class="form-group full-width"><label class="check"><input type="checkbox" id="f-cash"><span>Saya ingin bayar DP / Lunas dengan <b>Cash</b> di tempat <small class="muted">(perlu persetujuan admin)</small></span></label></div>
       <div class="form-group full-width"><label>Catatan</label><textarea id="f-catatan" rows="2" maxlength="300" placeholder="Opsional" style="resize:vertical"></textarea></div>
       <div class="form-group full-width"><div class="est" id="f-est"></div></div>
     </div>
@@ -145,7 +149,7 @@ function viewForm() {
     let jam = null;
     const rd = () => ({
         nama: $("#f-nama").value.trim(), wa: $("#f-wa").value, lokasi: $("#f-lokasi").value, room: $("#f-room").value, tanggal: $("#f-tanggal").value,
-        durasi: parseInt($("#f-durasi").value) || 0, orang: parseInt($("#f-orang").value) || 0, mic: parseInt($("#f-mic").value) || 0, cash: $("#f-cash").checked, catatan: $("#f-catatan").value.trim(), jam
+        durasi: parseInt($("#f-durasi").value) || 0, orang: parseInt($("#f-orang").value) || 0, mic: parseInt($("#f-mic").value) || 0, catatan: $("#f-catatan").value.trim(), jam
     });
     const fillRooms = () => {
         const l = $("#f-lokasi").value, rs = (ST.rooms[l] || []).filter(r => r.active !== false);
@@ -173,7 +177,7 @@ function viewForm() {
           ${p.extraN ? `<div class="kv"><span>${p.extraN} orang tambahan${ST.addonPerHour ? ` × ${v.durasi} jam` : ""}</span><b>${rupiah(p.extra)}</b></div>` : ""}
           ${v.mic ? `<div class="kv"><span>${v.mic} mic${ST.micPerHour ? ` × ${v.durasi} jam` : ""}</span><b>${rupiah(p.micT)}</b></div>` : ""}
           <div class="kv"><span>Estimasi total</span><b>${rupiah(p.total)}</b></div>
-          <div class="kv highlight"><span>DP yang perlu dibayar (${ST.dpPercent}%)</span><b>${rupiah(p.dp)}</b></div>
+          <div class="kv highlight"><span>DP Minimal (${ST.dpPercent}%)</span><b>${rupiah(p.dp)}</b></div>
           <small class="hint">Angka final dikonfirmasi admin.</small>` : `<small class="hint">Tarif akan dikonfirmasi admin saat booking disetujui.</small>`;
     };
     const slots = async () => {
@@ -217,7 +221,6 @@ function viewForm() {
         $("#f-durasi").value = retry.durasi;
         $("#f-orang").value = retry.orang;
         $("#f-mic").value = retry.mic;
-        $("#f-cash").checked = retry.cash;
         $("#f-catatan").value = retry.catatan;
         all();
     }
@@ -236,7 +239,7 @@ function viewForm() {
         try {
             if (!(await checkFree(v.lokasi, v.room, s, e2, ST.bufferMin * 60000, true))) { toast("Jam itu baru saja terisi. Pilih jam lain.", "error"); setBusy(btn, false); jam = null; slots(); return; }
             const secret = randSecret(16), kode = genKode(), wa = normWA(v.wa), p = calcPrice(ST, r, v.durasi, v.orang, v.mic);
-            const data = { bid: randSecret(8), kode, nama: v.nama, wa, lokasi: v.lokasi, room: v.room, tanggal: v.tanggal, jamMulai: v.jam, durasi: v.durasi, startMs: s, endMs: e2, orang: v.orang, mic: v.mic, estTotal: p.total, cashDp: v.cash, status: "PENDING", tipe: "ONLINE", createdAt: serverTimestamp() };
+            const data = { bid: randSecret(8), kode, nama: v.nama, wa, lokasi: v.lokasi, room: v.room, tanggal: v.tanggal, jamMulai: v.jam, durasi: v.durasi, startMs: s, endMs: e2, orang: v.orang, mic: v.mic, estTotal: p.total, status: "PENDING", tipe: "ONLINE", createdAt: serverTimestamp() };
             if (v.catatan) data.catatan = v.catatan;
             const batch = writeBatch(db);
             batch.set(doc(db, "bookings", secret), data);
@@ -259,7 +262,7 @@ function stepper(id, mn, mx, val) {
 function viewDetail(secret) {
     view.innerHTML = `<div class="panel center muted">Memuat booking…</div>`;
     let last = null, fresh = sessionStorage.getItem("araya_new") === secret;
-    const ui = { proof: null, sender: "" };
+    const ui = { proof: null, sender: "", payMethod: null, payType: "DP_MIN", manualAmount: 0 };
     lastStatus = null;
     const draw = () => { if (last) renderDetail(secret, last, fresh, ui); };
 
@@ -269,6 +272,11 @@ function viewDetail(secret) {
 
         if (lastStatus && lastStatus !== d.status && ["MENUNGGU_BAYAR", "TERKONFIRMASI", "DITOLAK", "MENUNGGU_VERIFIKASI"].includes(d.status)) {
             beepUser();
+        }
+        if (lastStatus && lastStatus !== "MENUNGGU_BAYAR" && d.status === "MENUNGGU_BAYAR") {
+            ui.payMethod = null;
+            ui.payType = "DP_MIN";
+            ui.manualAmount = 0;
         }
         lastStatus = d.status;
 
@@ -297,31 +305,60 @@ function renderDetail(secret, b, fresh, ui) {
     if (eff === "PENDING") body += `<div class="panel"><h3>${icon("hourglass_top")} Menunggu konfirmasi admin</h3><p class="muted center">Slot belum terkunci. Admin akan mengecek kondisi room, lalu kamu akan dikabari lewat WhatsApp. Halaman ini otomatis berubah saat ada kabar.</p></div>`;
 
     if (eff === "MENUNGGU_BAYAR") {
-        const cash = b.dpMethod === "CASH";
-        body += `<div class="panel pay"><h3>${icon("payments")} Bayar DP sebelum waktu habis</h3>
+        const d = b.dpDue || Math.round((b.total || 0) * (ST.dpPercent || 50) / 100);
+        const total = b.total || 0;
+        const finalAmount = ui.payType === "LUNAS" ? total : ui.payType === "DP_MANUAL" ? ui.manualAmount : d;
+
+        body += `<div class="panel pay"><h3>${icon("payments")} Pilih Metode Pembayaran</h3>
           <div class="countdown" data-cd="${b.payDeadline}">${fmtCountdown(b.payDeadline - now())}</div><p class="muted center">Batas bayar: ${esc(fmtDT(b.payDeadline))} WITA</p>`;
-        
-        if (cash) {
-            body += `<div class="kv total"><span>DP Cash</span><b>${rupiah(b.dpDue)}</b></div>
-            <p class="center">Silakan menuju kasir untuk melakukan pembayaran.</p>
-            <div class="qr-box">${qrSvg(b.kode)}</div><div class="big-code">${esc(b.kode)}</div>
-            <p class="muted center">Tunjukkan QR di atas ke admin/kasir untuk diverifikasi (Lunas: ${rupiah(b.total)}).</p>`;
-        } else {
+
+        if (!ui.payMethod) {
+            body += `<div class="form-grid" style="margin-top:16px">
+                <button class="btn btn-save" id="pickQris" style="flex-direction:column; padding:20px; height:auto;">
+                    ${icon("qr_code_2", 32)}<br><b style="font-size:16px; margin-top:8px;">QRIS</b><br><small>Transfer / E-Wallet</small>
+                </button>
+                <button class="btn btn-ghost" id="pickCash" style="flex-direction:column; padding:20px; height:auto;">
+                    ${icon("payments", 32)}<br><b style="font-size:16px; margin-top:8px;">CASH</b><br><small>Bayar di Kasir</small>
+                </button>
+            </div>`;
+        } else if (ui.payMethod === "QRIS") {
+            body += `<div class="kv total"><span>Total Tagihan</span><b>${rupiah(total)}</b></div>
+            <div class="kv"><span>Minimal DP (${ST.dpPercent}%)</span><b>${rupiah(d)}</b></div>
+            <div class="row-btns" style="margin-bottom:16px; gap:8px; justify-content:center;">
+                <button class="btn btn-sm ${ui.payType === 'DP_MIN' ? 'btn-save' : 'btn-ghost'}" data-pt="DP_MIN">DP Minimal</button>
+                <button class="btn btn-sm ${ui.payType === 'DP_MANUAL' ? 'btn-save' : 'btn-ghost'}" data-pt="DP_MANUAL">DP Manual</button>
+                <button class="btn btn-sm ${ui.payType === 'LUNAS' ? 'btn-save' : 'btn-ghost'}" data-pt="LUNAS">Lunas</button>
+            </div>
+            ${ui.payType === 'DP_MANUAL' ? `<div class="form-group" style="margin-bottom:16px;"><label>Nominal DP (Rp)</label><input id="manualDp" data-money inputmode="numeric" value="${ui.manualAmount || ''}" placeholder="Masukkan nominal..."></div>` : ''}
+            <div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(finalAmount)}</div></div>`;
+            
             const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "";
-            if (q && q.payload) { try { qr = qrSvg(makeDynamic(q.payload, b.payAmount)); } catch (e) { qr = ""; } }
-            body += `<div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(b.payAmount)}</div></div>
-              ${qr ? `<div class="qr-box" id="payQrBox">${qr}</div>
+            if (q && q.payload && finalAmount > 0) { try { qr = qrSvg(makeDynamic(q.payload, finalAmount)); } catch (e) { qr = ""; } }
+            body += `${qr ? `<div class="qr-box" id="payQrBox">${qr}</div>
               <div class="row-btns" style="justify-content:center">
                 <button class="btn btn-ghost" id="dlQr">${icon("download", 16)} Unduh QR</button>
               </div>
               <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia. Hubungi admin untuk cara bayar.</span></div>`}
-              <div class="proof"><label>Bukti pembayaran <small class="muted">(Wajib berupa screenshot)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" hidden>
-              <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening">
-              <button class="btn btn-save btn-block" id="paidBtn">${icon("task_alt")} Saya Sudah Bayar</button>
-              <small class="muted">Tekan hanya setelah transfer berhasil. Admin akan mencocokkan dengan mutasi QRIS.</small></div>`;
+              <div class="proof"><label>Bukti pembayaran <small class="muted">(Wajib berupa screenshot)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" ${ui.proof ? "" : "hidden"} src="${ui.proof || ""}">
+              <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening" value="${ui.sender || ""}">
+              <button class="btn btn-save btn-block" id="paidBtn" ${finalAmount <= 0 ? 'disabled' : ''}>${icon("task_alt")} Saya Sudah Bayar</button>
+              <small class="muted">Tekan hanya setelah transfer berhasil. Admin akan mencocokkan dengan mutasi QRIS.</small></div>
+              <button class="btn btn-ghost btn-sm" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
+        } else if (ui.payMethod === "CASH") {
+            body += `<div class="kv total"><span>Total Tagihan</span><b>${rupiah(total)}</b></div>
+            <div class="kv"><span>Minimal DP (${ST.dpPercent}%)</span><b>${rupiah(d)}</b></div>
+            <p class="muted center">Silakan pilih Anda mau bayar DP atau Lunas di kasir. Admin akan mengonfirmasi nominal yang Anda bayarkan.</p>
+            <div class="row-btns" style="margin-bottom:16px; gap:8px; justify-content:center;">
+                <button class="btn btn-sm ${ui.payType === 'DP_MIN' ? 'btn-save' : 'btn-ghost'}" data-pt="DP_MIN">DP Minimal</button>
+                <button class="btn btn-sm ${ui.payType === 'LUNAS' ? 'btn-save' : 'btn-ghost'}" data-pt="LUNAS">Lunas</button>
+            </div>
+            <div class="pay-amount"><small>Nominal yang harus disiapkan</small><div class="nominal">${rupiah(finalAmount)}</div></div>
+            <button class="btn btn-save btn-block" id="paidCashBtn">${icon("storefront")} Konfirmasi Bayar Cash</button>
+            <button class="btn btn-ghost btn-sm" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
         }
         body += `</div>`;
     }
+
     if (eff === "HANGUS" && b.status === "MENUNGGU_BAYAR") body += `<div class="panel"><h3>${icon("timer_off")} Waktu pembayaran habis</h3><p class="muted center">Slot dilepas. Kalau kamu <b>sudah terlanjur transfer</b>, segera hubungi admin dengan kode ${esc(b.kode)}.</p></div>`;
     else if (eff === "HANGUS") body += `<div class="panel"><h3>${icon("timer_off")} Permintaan hangus</h3><p class="muted center">Admin belum sempat memproses atau kamu melewati batas waktu. Kamu bisa mengajukan lagi.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
     if (eff === "MENUNGGU_VERIFIKASI") body += `<div class="panel"><h3>${icon("fact_check")} Pembayaran sedang diverifikasi</h3><p class="muted center">Terima kasih! Admin sedang mencocokkan pembayaranmu. Tidak perlu bayar lagi.</p></div>`;
@@ -376,8 +413,7 @@ function renderDetail(secret, b, fresh, ui) {
     $("#retryBtn")?.addEventListener("click", () => {
         sessionStorage.setItem("araya_retry", JSON.stringify({
             nama: b.nama, wa: b.wa, lokasi: b.lokasi, room: b.room, tanggal: b.tanggal,
-            durasi: b.durasi, orang: b.orang, mic: b.mic || 0,
-            catatan: b.catatan || "", cash: b.cashDp || false
+            durasi: b.durasi, orang: b.orang, mic: b.mic || 0, catatan: b.catatan || ""
         }));
         location.hash = "#/new";
     });
@@ -395,30 +431,88 @@ function renderDetail(secret, b, fresh, ui) {
         try { await writeUser(secret, { status: "DIBATALKAN", cancelBy: "USER" }); toast("Booking dibatalkan", "success"); } catch (e) { toast("Gagal membatalkan", "error"); }
     });
 
-    if (ui.proof && $("#proofPrev")) { $("#proofPrev").src = ui.proof; $("#proofPrev").hidden = false; }
-    if ($("#sender")) { $("#sender").value = ui.sender; $("#sender").addEventListener("input", e => { ui.sender = e.target.value; }); }
-    $("#proofFile")?.addEventListener("change", async e => {
-        const f = e.target.files[0]; if (!f) return;
-        if (ui.proof) {
-            if (!await confirmBox("Ganti Bukti?", "Bukti pembayaran sebelumnya akan diganti. Lanjutkan?", "Ya, Ganti")) {
-                e.target.value = "";
-                return;
+    if (eff === "MENUNGGU_BAYAR") {
+        const d = b.dpDue || Math.round((b.total || 0) * (ST.dpPercent || 50) / 100);
+        const total = b.total || 0;
+        const finalAmount = ui.payType === "LUNAS" ? total : ui.payType === "DP_MANUAL" ? ui.manualAmount : d;
+
+        $("#pickQris")?.addEventListener("click", () => { ui.payMethod = "QRIS"; draw(); });
+        $("#pickCash")?.addEventListener("click", () => { ui.payMethod = "CASH"; draw(); });
+        $("#backMethod")?.addEventListener("click", () => { ui.payMethod = null; ui.payType = "DP_MIN"; draw(); });
+
+        $$("[data-pt]").forEach(btn => btn.addEventListener("click", () => {
+            ui.payType = btn.dataset.pt;
+            draw();
+        }));
+
+        $("#manualDp")?.addEventListener("input", e => {
+            ui.manualAmount = parseNum(e.target.value);
+            const el = $("#nominal");
+            if (el) el.textContent = rupiah(ui.manualAmount);
+            const svgBox = $("#payQrBox");
+            if (svgBox) {
+                const q = QRC[b.lokasi] || QRC.DEFAULT;
+                if (q && q.payload) {
+                    try {
+                        const amt = ui.manualAmount;
+                        if (amt >= d && amt <= total) svgBox.innerHTML = qrSvg(makeDynamic(q.payload, amt));
+                        else svgBox.innerHTML = `<div class="banner warn" style="margin:0">Nominal tidak valid (Min: ${rupiah(d)})</div>`;
+                    } catch (err) { svgBox.innerHTML = ""; }
+                }
             }
-        }
-        try { ui.proof = await compressImage(f); const im = $("#proofPrev"); im.src = ui.proof; im.hidden = false; } catch (x) { toast("Gambar tidak bisa dibaca", "error"); }
-    });
-    $("#paidBtn")?.addEventListener("click", async e => {
-        const btn = e.currentTarget;
-        if (!ui.proof) return toast("Wajib melampirkan bukti pembayaran (screenshot)!", "error");
-        if (!await confirmBox("Kirim konfirmasi bayar?", "Pastikan transfer sudah berhasil sebelum melanjutkan.", "Kirim")) return;
-        setBusy(btn, true, "Mengirim…");
-        try {
-            const batch = writeBatch(db);
-            batch.update(doc(db, "bookings", secret), { status: "MENUNGGU_VERIFIKASI", paidReportedAt: now(), sender: ($("#sender").value || "").slice(0, 40), upd: serverTimestamp() });
-            batch.set(doc(db, "proofs", secret), { img: ui.proof, at: now() });
-            await batch.commit(); toast("Terkirim! Admin akan memverifikasi.", "success");
-        } catch (x) { console.error(x); toast("Gagal mengirim. Mungkin batas waktu sudah lewat, hubungi admin.", "error"); setBusy(btn, false); }
-    });
+        });
+
+        $("#proofFile")?.addEventListener("change", async e => {
+            const f = e.target.files[0]; if (!f) return;
+            if (ui.proof) {
+                if (!await confirmBox("Ganti Bukti?", "Bukti pembayaran sebelumnya akan diganti. Lanjutkan?", "Ya, Ganti")) {
+                    e.target.value = "";
+                    return;
+                }
+            }
+            try { ui.proof = await compressImage(f); const im = $("#proofPrev"); im.src = ui.proof; im.hidden = false; } catch (x) { toast("Gambar tidak bisa dibaca", "error"); }
+        });
+        $("#sender")?.addEventListener("input", e => { ui.sender = e.target.value; });
+
+        $("#paidBtn")?.addEventListener("click", async e => {
+            const btn = e.currentTarget;
+            if (finalAmount < d || finalAmount > total) return toast(`Nominal DP manual harus antara ${rupiah(d)} dan ${rupiah(total)}`, "error");
+            if (!ui.proof) return toast("Wajib melampirkan bukti pembayaran (screenshot)!", "error");
+            if (!await confirmBox("Kirim konfirmasi bayar?", "Pastikan transfer sudah berhasil sebelum melanjutkan.", "Kirim")) return;
+            setBusy(btn, true, "Mengirim…");
+            try {
+                const batch = writeBatch(db);
+                batch.update(doc(db, "bookings", secret), { 
+                    status: "MENUNGGU_VERIFIKASI", 
+                    paidReportedAt: now(), 
+                    sender: (ui.sender || "").slice(0, 40), 
+                    dpMethod: "QRIS",
+                    paymentType: ui.payType,
+                    payAmount: finalAmount,
+                    upd: serverTimestamp() 
+                });
+                batch.set(doc(db, "proofs", secret), { img: ui.proof, at: now() });
+                await batch.commit(); toast("Terkirim! Admin akan memverifikasi.", "success");
+            } catch (x) { console.error(x); toast("Gagal mengirim. Mungkin batas waktu sudah lewat, hubungi admin.", "error"); setBusy(btn, false); }
+        });
+
+        $("#paidCashBtn")?.addEventListener("click", async e => {
+            const btn = e.currentTarget;
+            if (!await confirmBox("Konfirmasi Bayar Cash?", "Pastikan Anda sudah membayar di kasir sebelum menekan tombol ini.", "Ya, Konfirmasi")) return;
+            setBusy(btn, true, "Memproses…");
+            try {
+                await updateDoc(doc(db, "bookings", secret), {
+                    status: "MENUNGGU_VERIFIKASI",
+                    dpMethod: "CASH",
+                    paymentType: ui.payType,
+                    payAmount: finalAmount,
+                    paidReportedAt: now(),
+                    upd: serverTimestamp()
+                });
+                toast("Terkonfirmasi! Menunggu admin memverifikasi pembayaran cash Anda.", "success");
+            } catch (x) { console.error(x); toast("Gagal mengirim.", "error"); setBusy(btn, false); }
+        });
+    }
 }
 
 const writeUser = (secret, patch) => { const b = writeBatch(db); b.update(doc(db, "bookings", secret), { ...patch, upd: serverTimestamp() }); return b.commit(); };

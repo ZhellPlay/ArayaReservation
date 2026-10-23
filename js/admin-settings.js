@@ -35,8 +35,7 @@ const lokBlock = (l, rms) => `<div class="lok-block" data-loksec="${esc(l)}">
 </div>`;
 
 const TPL_NAMES = {
-    approve: "Persetujuan (QRIS)",
-    approveCash: "Persetujuan (Cash)",
+    approve: "Persetujuan",
     reject: "Penolakan",
     remind: "Pengingat Pembayaran",
     confirmed: "Konfirmasi Pembayaran"
@@ -108,6 +107,8 @@ export function renderSettings(el, S, H) {
     const num = (id, v, label, hint = "", money = false) => `<div class="form-group"><label>${label}</label><input id="${id}" ${money ? `data-money inputmode="numeric"` : `inputmode="decimal"`} value="${money ? fmtNum(v) : v ?? ""}">${hint ? `<small class="hint" style="margin-top:4px">${hint}</small>` : ""}</div>`;
 
     el.innerHTML = `
+    <button class="btn btn-save btn-block" id="setSave" style="margin-top: 0; margin-bottom: var(--space-xl);">${icon("save")} Simpan Pengaturan</button>
+
     <div class="form-card"><details class="set-sec"><summary>${icon("tune")} <span style="flex:1;text-align:left">Umum &amp; Kebijakan</span></summary><div class="form-grid">
       ${num("sDp", st.dpPercent, "DP default (%)")}${num("sHold", st.holdMinutes, "Batas bayar (menit)", "Setelah disetujui, slot ditahan sampai batas ini.")}
       ${num("sBuf", st.bufferMin, "Jeda antar sesi (menit)")}${num("sGrace", st.noShowGraceMin, "Toleransi telat (menit)")}
@@ -147,8 +148,6 @@ export function renderSettings(el, S, H) {
             <textarea data-tpl="${k}" rows="5" style="font-size:14px; line-height:1.6; resize:vertical;">${esc(st.templates[k])}</textarea>
           </div>`).join("")}
       </div></details></div>
-
-    <button class="btn btn-save btn-block" id="setSave" style="margin-top: 0; margin-bottom: var(--space-xl);">${icon("save")} Simpan Pengaturan</button>
 
     <div class="form-card"><details class="set-sec"><summary>${icon("build")} <span style="flex:1;text-align:left">Perawatan Data</span></summary>
       <p class="muted" style="margin-bottom:16px">Ekspor dulu, lalu bersihkan booking lama (&gt; 30 hari) untuk menghemat kuota Firebase.</p>

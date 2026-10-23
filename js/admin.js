@@ -216,18 +216,14 @@ function cardHTML(b, i = 0) {
     const tipe = b.tipe && b.tipe !== "ONLINE" ? ` · ${b.tipe}` : "";
     const clash = isOpen(b.status) && S.bookings.some(o => o.id !== b.id && o.lokasi === b.lokasi && o.room === b.room && ["TERKONFIRMASI", "CHECKED_IN", "MENUNGGU_VERIFIKASI"].includes(o.status) && ["TERKONFIRMASI", "CHECKED_IN", "MENUNGGU_VERIFIKASI"].includes(b.status) && b.startMs < o.endMs && b.endMs > o.startMs);
     let money = "";
-    if (b.total) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Total ${rupiah(b.total)} · DP ${rupiah(b.dpDue)} ${b.dpPaid ? `<b class="okc">✔ diterima ${rupiah(b.dpPaid)}</b>` : b.payAmount && b.dpMethod === "QRIS" ? `(transfer ${rupiah(b.payAmount)})` : ""}</span></div>`;
-    else if (b.estTotal) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Estimasi ${rupiah(b.estTotal)}${b.cashDp ? " · Cash" : ""}</span></div>`;
+    if (b.total) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Total ${rupiah(b.total)} · DP ${rupiah(b.dpDue)} ${b.dpPaid ? `<b class="okc">✔ diterima ${rupiah(b.dpPaid)}</b>` : b.payAmount ? `(transfer ${rupiah(b.payAmount)})` : ""}</span></div>`;
+    else if (b.estTotal) money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Estimasi ${rupiah(b.estTotal)}</span></div>`;
     const A = [], id = `data-id="${b.id}"`, bt = (act, cls, ic, txt) => `<button class="btn ${cls}" data-act="${act}" ${id}>${icon(ic, 15)}${txt}</button>`;
     if (st === "PENDING") A.push(bt("approve", "btn-ok", "check", "Setujui"), bt("reject", "btn-delete", "close", "Tolak"));
     if (st === "MENUNGGU_BAYAR") A.push(bt("remind", "btn-wa", "chat", "Ingatkan"), bt("cancel", "btn-delete", "block", "Batalkan"));
     if (st === "MENUNGGU_VERIFIKASI") A.push(bt("verify", "btn-ok", "fact_check", "Verifikasi"), bt("cancel", "btn-delete", "block", "Batalkan"));
     if (st === "TERKONFIRMASI") {
-        if (b.dpMethod === "CASH" && !b.dpPaid) {
-            A.push(bt("receive", "btn-ok", "payments", "Verifikasi Cash"), bt("cancel", "btn-delete", "block", "Batalkan"));
-        } else {
-            A.push(bt("checkin", "btn-ok", "login", b.tipe === "BLOK" ? "Mulai" : "Check-in"));
-        }
+        A.push(bt("checkin", "btn-ok", "login", b.tipe === "BLOK" ? "Mulai" : "Check-in"));
     }
     if (st === "CHECKED_IN") A.push(bt("finish", "btn-warn", "stop_circle", b.tipe === "BLOK" ? "Buka kembali" : "Selesai"));
     A.push(bt("detail", "btn-ghost", "more_horiz", "Detail"));
@@ -357,36 +353,31 @@ function approveModal(b) {
     const clashes = S.bookings.filter(o => o.id !== b.id && o.lokasi === b.lokasi && o.room === b.room && b.startMs < o.endMs + bufMs() && b.endMs > o.startMs - bufMs());
     const hard = clashes.filter(o => ["MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN"].includes(o.status) || (o.status === "MENUNGGU_BAYAR" && eff(o) !== "HANGUS"));
     const rivals = clashes.filter(o => eff(o) === "PENDING");
-    const cashDefault = !!b.cashDp, hold = S.st.holdMinutes || 30;
-    const defDeadline = cashDefault ? Math.max(b.startMs, now() + 30 * 60000) : now() + hold * 60000;
+    const hold = S.st.holdMinutes || 30;
+    const defDeadline = now() + hold * 60000;
 
     const m = modal(`<h3>${icon("check_circle")} Setujui booking</h3>
       <p><b>${esc(b.nama)}</b> · ${esc(b.lokasi)} ${esc(b.room)}<br>${esc(fmtDate(b.tanggal))}, ${esc(rangeTxt(b))}</p>
       ${hard.length ? `<div class="banner warn">${icon("warning")}<span>Bentrok dengan: ${hard.map(o => esc(o.nama) + " " + rangeTxt(o)).join(", ")}. Sistem akan menolak.</span></div>` : ""}
       ${rivals.length ? `<div class="banner warn">${icon("groups")}<span>Ada ${rivals.length} permintaan lain di jam ini: ${rivals.map(o => esc(o.nama) + " " + rangeTxt(o)).join(", ")}. Menyetujui satu akan menahan slot.</span></div>` : ""}
-      ${b.cashDp ? `<div class="banner ok">${icon("info")}<span>Pelanggan minta bayar Cash.</span></div>` : ""}
       <div class="form-grid">
         <div class="form-group"><label>Total (Otomatis)</label><input value="${rupiah(p.total)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
-        <div class="form-group"><label>DP (${S.st.dpPercent}%)</label><input value="${rupiah(p.dp)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
-        <div class="form-group"><label>Metode DP</label><select id="aMethod" disabled style="opacity:0.7; cursor:not-allowed;"><option value="QRIS" ${cashDefault ? "" : "selected"}>QRIS</option><option value="CASH" ${cashDefault ? "selected" : ""}>Cash di tempat</option></select></div>
-        <div class="form-group"><label>Batas bayar (WITA)</label><input type="datetime-local" id="aDead" value="${witaDateTimeInput(defDeadline)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
+        <div class="form-group"><label>DP Minimal (${S.st.dpPercent}%)</label><input value="${rupiah(p.dp)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
+        <div class="form-group full-width"><label>Batas bayar (WITA)</label><input type="datetime-local" id="aDead" value="${witaDateTimeInput(defDeadline)}" readonly style="opacity:0.7; cursor:not-allowed;"></div>
       </div>
       <label class="check" style="margin-top:8px"><input type="checkbox" id="aChk"><span>Saya sudah memastikan room <b>kosong</b> di jam ini (termasuk walk-in yang sedang main).</span></label>
       <div class="modal-actions" style="margin-top:20px"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-ok" id="aGo">${icon("check", 16)} Setujui</button></div>`);
 
     $("#aGo", m.el).onclick = async e => {
-        const btn = e.currentTarget, method = cashDefault ? "CASH" : "QRIS", deadline = fromDateTimeInput($("#aDead", m.el).value);
+        const btn = e.currentTarget, deadline = fromDateTimeInput($("#aDead", m.el).value);
         if (!$("#aChk", m.el).checked) return toast("Centang dulu: pastikan room kosong", "error");
-        if (method === "QRIS" && p.dp <= 0) return toast("DP untuk QRIS harus diisi", "error");
         if (!deadline || deadline <= now()) return toast("Batas bayar harus di masa depan", "error");
-        const payAmount = p.dp;
         setBusy(btn, true, "Memproses…");
-        const isCash = method === "CASH";
         const add = addOf(b, "MENUNGGU_BAYAR", deadline);
-        const patch = { status: "MENUNGGU_BAYAR", total: p.total, dpDue: p.dp, dpMethod: method, payAmount: isCash ? 0 : p.dp, payDeadline: deadline, approvedAt: now(), payNote: "" };
+        const patch = { status: "MENUNGGU_BAYAR", total: p.total, dpDue: p.dp, payDeadline: deadline, approvedAt: now(), payNote: "" };
         
         const ok = await run(() => changeStatus(b, patch, { add }), "Disetujui");
-        if (ok) { m.close(); waPrompt({ ...b, ...patch }, method === "CASH" ? "approveCash" : "approve", "Kabari pelanggan"); } else setBusy(btn, false);
+        if (ok) { m.close(); waPrompt({ ...b, ...patch }, "approve", "Kabari pelanggan"); } else setBusy(btn, false);
     };
 }
 
@@ -404,30 +395,41 @@ function rejectModal(b) {
 
 async function verifyModal(b) {
     let img = ""; try { const p = await getDoc(doc(db, "proofs", b.id)); if (p.exists() && String(p.data().img).startsWith("data:image/")) img = p.data().img; } catch (e) { }
-    const m = modal(`<h3>${icon("fact_check")} Verifikasi pembayaran</h3>
-      <div class="banner ok" style="flex-direction:column;gap:4px"><span>Cari di mutasi / notifikasi merchant QRIS:</span><b style="font-size:24px;font-family:Orbitron">${rupiah(b.payAmount)}</b><span class="muted">Nominal harus PERSIS sama. Dilaporkan ${b.paidReportedAt ? esc(fmtDT(b.paidReportedAt)) : "-"}${b.sender ? " · pengirim: " + esc(b.sender) : ""}</span></div>
-      ${img ? `
+    
+    const method = b.dpMethod === "CASH" ? "CASH (Bayar di Kasir)" : "QRIS (Transfer)";
+    const tipe = b.paymentType === "LUNAS" ? "LUNAS" : b.paymentType === "DP_MANUAL" ? "DP (Manual)" : "DP (Minimal)";
+    const nominal = b.payAmount || b.dpDue || 0;
+
+    const m = modal(`<h3>${icon("fact_check")} Verifikasi Pembayaran</h3>
+      <div class="kv"><span>Metode</span><b>${method}</b></div>
+      <div class="kv"><span>Tipe</span><b>${tipe}</b></div>
+      <div class="banner ok" style="flex-direction:column;gap:4px; margin-top:12px;">
+        <span>${b.dpMethod === 'CASH' ? 'Nominal yang harusnya diterima:' : 'Cari di mutasi / notifikasi merchant QRIS:'}</span>
+        <b style="font-size:24px;font-family:Orbitron">${rupiah(nominal)}</b>
+        <span class="muted">${b.dpMethod === 'QRIS' ? 'Nominal harus PERSIS sama.' : ''} Dilaporkan ${b.paidReportedAt ? esc(fmtDT(b.paidReportedAt)) : "-"}${b.sender ? " · pengirim: " + esc(b.sender) : ""}</span>
+      </div>
+      ${b.dpMethod === 'QRIS' ? (img ? `
         <img class="proof-img" src="${img}" alt="bukti">
         <div class="row-btns" style="justify-content:center; margin-top:10px;">
             <a href="${img}" download="bukti-${b.kode}.jpg" class="btn btn-ghost" style="text-decoration:none;">
                 ${icon("download", 16)} Unduh Foto
             </a>
         </div>
-      ` : `<p class="muted center">Tidak ada screenshot terlampir. Cocokkan langsung di mutasi.</p>`}
+      ` : `<p class="muted center">Tidak ada screenshot terlampir. Cocokkan langsung di mutasi.</p>`) : `<p class="muted center">Pastikan uang Cash sudah diterima di kasir sejumlah nominal di atas.</p>`}
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Tutup</button><button class="btn btn-delete" id="vNo">Belum masuk</button><button class="btn btn-ok" id="vOk">${icon("check", 16)} Sudah masuk</button></div>`);
     $("#vOk", m.el).onclick = async () => {
-        const patch = { status: "TERKONFIRMASI", dpPaid: b.payAmount, dpPaidMethod: "QRIS", dpPaidAt: now(), verifiedAt: now() };
+        const patch = { status: "TERKONFIRMASI", dpPaid: nominal, dpPaidAt: now(), verifiedAt: now() };
         if (await run(async () => { await changeStatus(b, patch, { add: addOf(b, "TERKONFIRMASI") }); try { await deleteDoc(doc(db, "proofs", b.id)); } catch (e) { } }, "Pembayaran dikonfirmasi")) { m.close(); waPrompt({ ...b, ...patch }, "confirmed", "Kabari pelanggan"); }
     };
     $("#vNo", m.el).onclick = async () => {
-        const note = await promptBox("Catatan untuk pelanggan", "Pesan ini tampil di halaman pelanggan.", "Pembayaran belum kami temukan. Cek kembali nominal & coba lagi.", "Kembalikan"); if (note === null) return;
+        const note = await promptBox("Catatan untuk pelanggan", "Pesan ini tampil di halaman pelanggan.", b.dpMethod === "CASH" ? "Pembayaran cash belum kami terima." : "Pembayaran belum kami temukan. Cek kembali nominal & coba lagi.", "Kembalikan"); if (note === null) return;
         const dl = now() + 15 * 60000, patch = { status: "MENUNGGU_BAYAR", payDeadline: dl, payNote: note };
         if (await run(async () => { await changeStatus(b, patch, { add: addOf(b, "MENUNGGU_BAYAR", dl) }); try { await deleteDoc(doc(db, "proofs", b.id)); } catch (e) { } }, "Dikembalikan ke menunggu bayar (+15 menit)")) m.close();
     };
 }
 
 function receiveModal(b) {
-    const m = modal(`<h3>${icon("payments")} Verifikasi Pembayaran</h3><p>${esc(b.nama)} · Total ${rupiah(b.total)} / DP ${rupiah(b.dpDue)}</p>
+    const m = modal(`<h3>${icon("payments")} Verifikasi Pembayaran Cash</h3><p>${esc(b.nama)} · Total ${rupiah(b.total)} / DP Minimal ${rupiah(b.dpDue)}</p>
       <div class="form-grid">
         <div class="form-group"><label>Nominal diterima</label><input id="dNom" data-money inputmode="numeric" value="${fmtNum(b.dpDue)}"></div>
         <div class="form-group"><label>Metode</label><select id="dMet"><option value="CASH">Cash</option><option value="QRIS">QRIS / Transfer</option></select></div>
@@ -505,7 +507,7 @@ function detailModal(b) {
     $("#dRej", m.el)?.addEventListener("click", () => { m.close(); rejectModal(b); });
     $("#dEdit", m.el)?.addEventListener("click", () => { m.close(); editModal(b); });
     $("#dLink", m.el)?.addEventListener("click", () => copyText(bookingLink(b.id)));
-    $("#dWa", m.el)?.addEventListener("click", () => sendWA(b, st === "TERKONFIRMASI" ? "confirmed" : st === "MENUNGGU_BAYAR" ? (b.dpMethod === "CASH" ? "approveCash" : "approve") : "confirmed"));
+    $("#dWa", m.el)?.addEventListener("click", () => sendWA(b, st === "TERKONFIRMASI" ? "confirmed" : st === "MENUNGGU_BAYAR" ? "approve" : "confirmed"));
     $("#dVCash", m.el)?.addEventListener("click", () => { m.close(); receiveModal(b); });
 
     $("#dDel", m.el)?.addEventListener("click", async () => {
@@ -529,7 +531,7 @@ function editModal(b) {
       <div class="form-group"><label>Mulai (WITA)</label><input type="datetime-local" id="eDt" value="${witaDateTimeInput(b.startMs)}"></div>
       <div class="form-group"><label>Durasi (jam)</label><input type="number" step="0.5" min="0.5" id="eDur" value="${b.durasi}"></div>
       <div class="form-group"><label>Orang</label><input type="number" id="eOrg" value="${b.orang}"></div><div class="form-group"><label>Mic</label><input type="number" id="eMic" value="${b.mic || 0}"></div>
-      <div class="form-group"><label>Total (Otomatis)</label><input id="eTot" readonly style="opacity:0.7; cursor:not-allowed;"></div><div class="form-group"><label>DP (Otomatis)</label><input id="eDp" readonly style="opacity:0.7; cursor:not-allowed;"></div>
+      <div class="form-group"><label>Total (Otomatis)</label><input id="eTot" readonly style="opacity:0.7; cursor:not-allowed;"></div><div class="form-group"><label>DP Minimal (Otomatis)</label><input id="eDp" readonly style="opacity:0.7; cursor:not-allowed;"></div>
       <div class="form-group full-width"><label>Catatan</label><textarea id="eCat" rows="2">${esc(b.catatan || "")}</textarea></div></div>
       ${isOpen(b.status) && b.slot ? `<p class="muted">Slot akan dipindahkan otomatis, dan dicek bentrok ulang.</p>` : ""}
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-save" id="eGo" style="flex:0 0 auto;padding:12px 22px">Simpan</button></div>`);
@@ -584,7 +586,6 @@ function editModal(b) {
             else {
                 patch.total = m_tot;
                 patch.dpDue = m_dp;
-                if (b.status === "MENUNGGU_BAYAR" && b.dpMethod === "QRIS" && m_dp > 0) patch.payAmount = m_dp;
             }
         }
         const nb = { ...b, ...patch };
