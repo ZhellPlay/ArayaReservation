@@ -5,7 +5,7 @@ import {
 import {
     $, $$, esc, toast, modal, confirmBox, promptBox, setBusy, copyText, icon, rupiah, fmtNum, parseNum, normWA, randSecret, genKode, lookupId, normKode,
     witaDate, witaTime, witaDateTimeInput, fromDateTimeInput, addDays, fmtDate, fmtDT, tsMs, now, syncClock, STATUS, HOLDING, pill, effStatus, getEndMs,
-    mergeSettings, roomCfg, calcPrice, fillTpl, waLink, bookingLink, siteLink, startBackground, isHoliday
+    mergeSettings, roomCfg, calcPrice, waLink, bookingLink, startBackground, isHoliday
 } from "./lib.js";
 import { applyTx } from "./avail.js";
 import { renderSettings } from "./admin-settings.js";
@@ -321,22 +321,15 @@ const changeStatus = (b, patch, { release = false, add = null } = {}) => {
     return updateDoc(refOf(b), data);
 };
 
-const tplVars = (b, x = {}) => ({ nama: b.nama, lokasi: b.lokasi, room: b.room, tanggal: fmtDate(b.tanggal, false), jam: `${b.jamMulai}-${witaTime(b.endMs)}`, nominal: rupiah(b.payAmount || b.dpDue || 0), deadline: b.payDeadline ? fmtDT(b.payDeadline) + " WITA" : "", link: bookingLink(b.id), kode: b.kode, alasan: b.rejectReason || "", site: siteLink(), ...x });
-
-function sendWA(b, key, x = {}) {
+// Fungsi WA Admin disederhanakan: Hanya membuka chat WA
+function openWA(b) {
     if (!b.wa) return toast("Booking ini tidak punya nomor WA", "error");
-    open(waLink(b.wa, fillTpl(S.st.templates[key], tplVars(b, x))), "_blank");
-}
-
-function waPrompt(b, key, title, x) {
-    const m = modal(`<div class="modal-icon"><span class="material-icons-round">chat</span></div><h3>${esc(title)}</h3><p>Kirim kabar ke ${esc(b.nama)} lewat WhatsApp supaya halaman booking-nya dibuka.</p>
-      <div class="modal-actions"><button class="btn btn-ghost" data-close>Nanti</button><button class="btn btn-wa" id="waGo">${icon("send", 16)} Kirim WA</button></div>`, { wide: false });
-    $("#waGo", m.el).onclick = () => { sendWA({ ...b, ...(x || {}) }, key, x); m.close(); };
+    open(waLink(b.wa), "_blank");
 }
 
 const A = {
     detail: b => detailModal(b), approve: b => approveModal(b), reject: b => rejectModal(b), verify: b => verifyModal(b), receive: b => receiveModal(b),
-    remind: b => sendWA(b, "remind"),
+    remind: b => openWA(b),
     checkin: b => run(() => changeStatus(b, { status: "CHECKED_IN", checkedInAt: now() }), "Check-in tercatat"),
     finish: b => run(() => changeStatus(b, { status: "SELESAI", finishedAt: now() }, { release: true }), "Sesi selesai, room dibuka"),
     cancel: async b => { if (await confirmBox("Batalkan booking?", `Booking ${b.nama} dibatalkan dan slot dilepas.`, "Ya, batalkan", true)) run(() => changeStatus(b, { status: "DIBATALKAN", cancelBy: "ADMIN" }, { release: true }), "Dibatalkan"); },
@@ -392,7 +385,7 @@ function approveModal(b) {
         const patch = { status: "MENUNGGU_BAYAR", total: p.total, dpDue: p.dp, payDeadline: deadline, approvedAt: now(), payNote: "" };
         
         const ok = await run(() => changeStatus(b, patch, { add }), "Disetujui");
-        if (ok) { m.close(); waPrompt({ ...b, ...patch }, "approve", "Kabari pelanggan"); } else setBusy(btn, false);
+        if (ok) { m.close(); openWA({ ...b, ...patch }); } else setBusy(btn, false);
     };
 }
 
@@ -404,7 +397,7 @@ function rejectModal(b) {
     $$("[data-r]", m.el).forEach(x => x.onclick = () => $("#rReason", m.el).value = x.dataset.r);
     $("#rGo", m.el).onclick = async () => {
         const reason = $("#rReason", m.el).value.trim() || "Jadwal tidak tersedia."; const patch = { status: "DITOLAK", rejectReason: reason };
-        if (await run(() => changeStatus(b, patch, { release: !!b.slot }), "Ditolak")) { m.close(); waPrompt({ ...b, ...patch }, "reject", "Kabari pelanggan"); }
+        if (await run(() => changeStatus(b, patch, { release: !!b.slot }), "Ditolak")) { m.close(); openWA({ ...b, ...patch }); }
     };
 }
 
@@ -446,7 +439,7 @@ async function verifyModal(b) {
     
     $("#vOk", m.el).onclick = async () => {
         const patch = { status: "TERKONFIRMASI", dpPaid: nominal, dpPaidAt: now(), verifiedAt: now(), dpPaidMethod: method };
-        if (await run(async () => { await changeStatus(b, patch, { add: addOf(b, "TERKONFIRMASI") }); try { await deleteDoc(doc(db, "proofs", b.id)); } catch (e) { } }, "Pembayaran dikonfirmasi")) { m.close(); waPrompt({ ...b, ...patch }, "confirmed", "Kabari pelanggan"); }
+        if (await run(async () => { await changeStatus(b, patch, { add: addOf(b, "TERKONFIRMASI") }); try { await deleteDoc(doc(db, "proofs", b.id)); } catch (e) { } }, "Pembayaran dikonfirmasi")) { m.close(); openWA({ ...b, ...patch }); }
     };
     $("#vNo", m.el).onclick = async () => {
         const note = await promptBox("Catatan untuk pelanggan", "Pesan ini tampil di halaman pelanggan.", b.dpMethod === "CASH" ? "Pembayaran cash belum kami terima." : "Pembayaran belum kami temukan. Cek kembali nominal & coba lagi.", "Kembalikan"); if (note === null) return;
@@ -549,7 +542,7 @@ function detailModal(b) {
     $("#dRej", m.el)?.addEventListener("click", () => { m.close(); rejectModal(b); });
     $("#dEdit", m.el)?.addEventListener("click", () => { m.close(); editModal(b); });
     $("#dLink", m.el)?.addEventListener("click", () => copyText(bookingLink(b.id)));
-    $("#dWa", m.el)?.addEventListener("click", () => sendWA(b, st === "TERKONFIRMASI" ? "confirmed" : st === "MENUNGGU_BAYAR" ? "approve" : "confirmed"));
+    $("#dWa", m.el)?.addEventListener("click", () => openWA(b));
     $("#dVCash", m.el)?.addEventListener("click", () => { m.close(); receiveModal(b); });
 
     $("#dDel", m.el)?.addEventListener("click", async () => {
@@ -626,7 +619,6 @@ function editModal(b) {
                 upd: serverTimestamp()
             };
 
-            // 1. VALIDASI HARI LIBUR
             const hol = isHoliday(S.st, patch.lokasi, patch.tanggal);
             if (hol) {
                 try {
@@ -637,7 +629,6 @@ function editModal(b) {
                 return;
             }
 
-            // 2. VALIDASI BENTROK (Waktu)
             const buf = bufMs();
             const clash = S.bookings.find(o => 
                 o.id !== b.id && 

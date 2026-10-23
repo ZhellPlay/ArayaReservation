@@ -34,13 +34,6 @@ const lokBlock = (l, rms) => `<div class="lok-block" data-loksec="${esc(l)}">
     </div>
 </div>`;
 
-const TPL_NAMES = {
-    approve: "Persetujuan",
-    reject: "Penolakan",
-    remind: "Pengingat Pembayaran",
-    confirmed: "Konfirmasi Pembayaran"
-};
-
 function getDiff(oldSt, nextSt, renames = {}, roomRenames = {}) {
     const diffs = [];
     if (oldSt.dpPercent !== nextSt.dpPercent) diffs.push(`DP default: ${oldSt.dpPercent}% → ${nextSt.dpPercent}%`);
@@ -93,9 +86,6 @@ function getDiff(oldSt, nextSt, renames = {}, roomRenames = {}) {
     const h1 = JSON.stringify(oldSt.holidays || []), h2 = JSON.stringify(nextSt.holidays || []);
     if (h1 !== h2) diffs.push(`Daftar hari libur berubah`);
 
-    const tplChanged = Object.keys(nextSt.templates).some(k => oldSt.templates[k] !== nextSt.templates[k]);
-    if (tplChanged) diffs.push(`Template pesan WhatsApp diperbarui`);
-
     return diffs;
 }
 
@@ -135,19 +125,6 @@ export function renderSettings(el, S, H) {
       <div class="form-group"><label>Lokasi</label><select id="hLok"><option value="ALL">Semua lokasi</option>${st.lokasi.map(l => `<option>${esc(l)}</option>`).join("")}</select></div>
       <div class="form-group full-width"><label>Alasan</label><input id="hWhy" placeholder="mis. HUT Araya"></div></div>
       <button class="btn btn-ghost" id="hAdd" type="button" style="margin-top:12px">${icon("add", 16)} Tambah libur</button></details></div>
-
-    <div class="form-card"><details class="set-sec"><summary>${icon("sms")} <span style="flex:1;text-align:left">Template Pesan WhatsApp</span></summary>
-      <div class="est" style="margin-bottom:20px; border-color:var(--border-medium)">
-        <b>Variabel yang tersedia:</b><br>
-        <span class="muted" style="line-height:1.8; word-break:break-word; display:inline-block; margin-top:6px">{nama} · {lokasi} · {room} · {tanggal} · {jam} · {nominal} · {deadline} · {link} · {kode} · {alasan} · {site}</span>
-      </div>
-      <div class="form-grid" style="grid-template-columns: 1fr; gap:20px;">
-        ${Object.keys(DEFAULT_SETTINGS.templates).map(k => `
-          <div class="form-group">
-            <label style="color:var(--accent-1); font-size:12px; letter-spacing:1px">${TPL_NAMES[k] || k}</label>
-            <textarea data-tpl="${k}" rows="5" style="font-size:14px; line-height:1.6; resize:vertical;">${esc(st.templates[k])}</textarea>
-          </div>`).join("")}
-      </div></details></div>
 
     <div class="form-card"><details class="set-sec"><summary>${icon("build")} <span style="flex:1;text-align:left">Perawatan Data</span></summary>
       <p class="muted" style="margin-bottom:16px">Ekspor dulu, lalu bersihkan booking lama (&gt; 30 hari) untuk menghemat kuota Firebase.</p>
@@ -305,10 +282,9 @@ export function renderSettings(el, S, H) {
             pendingTtlHours: g("sTtl"), minLeadMin: g("sLead"), maxDurasi: maxD,
             micPrice: parseNum($("#sMic", el).value), addonPerHour: $("#sPerHour", el).checked, micPerHour: $("#sMicPerHour", el).checked,
             adminWA: $("#sWa", el).value.trim() ? normWA($("#sWa", el).value) : "", policy: $("#sPolicy", el).value.trim(),
-            holidays: hol.map(h => moves[h.lokasi] ? { ...h, lokasi: moves[h.lokasi] } : h), lokasi: nextLokasi, rooms: nextRooms, templates: {}
+            holidays: hol.map(h => moves[h.lokasi] ? { ...h, lokasi: moves[h.lokasi] } : h), lokasi: nextLokasi, rooms: nextRooms
         };
         if (next.dpPercent < 1 || next.dpPercent > 100) return toast("DP harus 1–100%", "error");
-        $$("[data-tpl]", el).forEach(t => next.templates[t.dataset.tpl] = t.value);
 
         const diffs = getDiff(st, next, renames, roomRenames);
         if (!diffs.length) {

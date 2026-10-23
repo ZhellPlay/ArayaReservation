@@ -304,11 +304,13 @@ function renderDetail(secret, b, fresh, ui, draw) {
     const names = ["Diajukan", "Disetujui", "Dibayar", "Siap main"];
     const stepsHtml = stage === undefined ? "" : `<div class="steps">${names.map((n, i) => `<div class="step ${i < stage ? "done" : i === stage ? "now" : ""}"><i></i><span>${n}</span></div>`).join("")}</div>`;
     
-    // --- LOGIKA DINAMIS PESAN WA ADMIN ---
-    const isEarlyStage = ["PENDING", "MENUNGGU_BAYAR"].includes(eff);
-    const waText = isEarlyStage 
-        ? `Halo admin, saya *${b.nama}* (Kode: *${b.kode}*). Mohon konfirmasi booking saya untuk tanggal ${fmtDate(b.tanggal, false)} jam ${b.jamMulai}. Terima kasih.`
-        : `Halo admin, saya *${b.nama}* (Kode: *${b.kode}*). Saya ingin mengubah jadwal / bertanya mengenai booking saya untuk tanggal ${fmtDate(b.tanggal, false)} jam ${b.jamMulai}. Terima kasih.`;
+    // LOGIKA WA ADMIN DINAMIS
+    let waText = "";
+    if (eff === "PENDING") {
+        waText = `Halo admin, saya *${b.nama}* (Kode: *${b.kode}*). Mohon konfirmasi booking saya untuk tanggal ${fmtDate(b.tanggal, false)} jam ${b.jamMulai}. Terima kasih.`;
+    } else if (eff === "MENUNGGU_VERIFIKASI" || eff === "TERKONFIRMASI") {
+        waText = `Halo admin, saya *${b.nama}* (Kode: *${b.kode}*). Saya ingin mengubah jadwal / bertanya mengenai booking saya untuk tanggal ${fmtDate(b.tanggal, false)} jam ${b.jamMulai}. Terima kasih.`;
+    }
     const adminWA = ST.adminWA ? waLink(ST.adminWA, waText) : "";
 
     let body = "";
@@ -421,7 +423,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
     if (eff === "HANGUS" && b.status === "MENUNGGU_BAYAR") body += `<div class="panel"><h3>${icon("timer_off")} Waktu pembayaran habis</h3><p class="muted center">Slot dilepas. Kalau kamu <b>sudah terlanjur transfer</b>, segera hubungi admin dengan kode ${esc(b.kode)}.</p></div>`;
     else if (eff === "HANGUS") body += `<div class="panel"><h3>${icon("timer_off")} Permintaan hangus</h3><p class="muted center">Admin belum sempat memproses atau kamu melewati batas waktu. Kamu bisa mengajukan lagi.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
     
-    // --- STATUS MENUNGGU VERIFIKASI (DIBEDAKAN QRIS & CASH) ---
+    // STATUS MENUNGGU VERIFIKASI
     if (eff === "MENUNGGU_VERIFIKASI") {
         const isCash = b.dpMethod === "CASH";
         body += `<div class="panel">
@@ -439,7 +441,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
             if (b.dpMethod === "CASH" && !b.dpPaid) {
                 body += `<div class="banner warn" style="margin-bottom: 12px;">${icon("info")}<span>Silakan bayar DP Cash (${rupiah(b.dpDue)}) atau Lunas (${rupiah(b.total)}) di kasir. Tunjukkan QR di bawah ini.</span></div>`;
             }
-            body += `<p class="muted center">Tunjukkan QR ini ke admin saat datang. Datang paling lambat ${ST.noShowGraceMin} menit setelah jam mulai.</p><div class="qr-box">${qrSvg(b.kode)}</div><div class="big-code">${esc(b.kode)}</div>`;
+            body += `<p class="muted center">Tunjukkan QR ini ke admin saat datang. Datang paling lambat ${ST.noShowGraceMin} menit setelah jam mulai. Jika ingin mengubah jadwal, silakan hubungi WA Admin di bawah.</p><div class="qr-box">${qrSvg(b.kode)}</div><div class="big-code">${esc(b.kode)}</div>`;
         } else {
             const endT = getEndMs(b);
             body += `<p class="muted center">Sesi berjalan sampai ${esc(witaTime(endT))}.</p>`;
