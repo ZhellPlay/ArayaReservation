@@ -315,12 +315,12 @@ function renderDetail(secret, b, fresh, ui, draw) {
           <div class="countdown" data-cd="${b.payDeadline}">${fmtCountdown(b.payDeadline - now())}</div><p class="muted center">Batas bayar: ${esc(fmtDT(b.payDeadline))} WITA</p>`;
 
         if (!ui.payMethod) {
-            body += `<div class="form-grid" style="margin-top:16px">
-                <button class="btn btn-save" type="button" id="pickQris" style="flex-direction:column; padding:20px; height:auto;">
-                    ${icon("qr_code_2", 32)}<br><b style="font-size:16px; margin-top:8px;">QRIS</b><br><small>Transfer / E-Wallet</small>
+            body += `<div class="form-grid" style="margin-top:16px; gap: 12px;">
+                <button class="btn btn-save" type="button" id="pickQris" style="flex-direction:column; padding:14px; height:auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">
+                    ${icon("qr_code_2", 28)}<br><b style="font-size:15px; margin-top:4px;">QRIS</b>
                 </button>
-                <button class="btn btn-ghost" type="button" id="pickCash" style="flex-direction:column; padding:20px; height:auto;">
-                    ${icon("payments", 32)}<br><b style="font-size:16px; margin-top:8px;">CASH</b><br><small>Bayar di Kasir</small>
+                <button class="btn btn-ghost" type="button" id="pickCash" style="flex-direction:column; padding:14px; height:auto; border-radius: 8px;">
+                    ${icon("payments", 28)}<br><b style="font-size:15px; margin-top:4px;">CASH</b>
                 </button>
             </div>`;
         } else if (ui.payMethod === "QRIS") {
@@ -362,8 +362,6 @@ function renderDetail(secret, b, fresh, ui, draw) {
                     body += `<div class="banner warn" style="justify-content:center;">${icon("warning")}<span>Nominal berubah. Tampilkan QRIS lagi untuk membuat QR dengan nominal terbaru.</span></div>`;
                 }
             } else {
-                body += `<div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(displayAmount)}</div></div>`;
-                
                 const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "", errMsg = "";
                 if (!q || !q.payload) {
                     errMsg = "Admin belum mengunggah QRIS untuk cabang ini.";
@@ -377,15 +375,21 @@ function renderDetail(secret, b, fresh, ui, draw) {
                     }
                 }
                 
-                body += `${qr ? `<div class="qr-box" id="payQrBox">${qr}</div>
+                body += qr ? `<div id="qrResultBox">
+                  <div class="pay-amount"><small>Nominal Tagihan</small><div class="nominal" id="nominal">${rupiah(displayAmount)}</div></div>
+                  <div class="qr-box" id="payQrBox">${qr}</div>
                   <div class="row-btns" style="justify-content:center">
                     <button class="btn btn-ghost" type="button" id="dlQr">${icon("download", 16)} Unduh QR</button>
                   </div>
-                  <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>${errMsg || "QRIS belum tersedia."}</span></div>`}
-                  <div class="proof"><label>Bukti pembayaran <small class="muted">(Wajib berupa screenshot)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" ${ui.proof ? "" : "hidden"} src="${ui.proof || ""}">
-                  <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening" value="${ui.sender || ""}">
-                  <button class="btn btn-save btn-block" type="button" id="paidBtn">${icon("task_alt")} Saya Sudah Bayar</button>
-                  <small class="muted">Tekan hanya setelah transfer berhasil. Admin akan mencocokkan dengan mutasi QRIS.</small></div>`;
+                  <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>
+                </div>
+                <div id="qrWarnBox" class="banner warn" style="display:none; justify-content:center; flex-direction:column;"></div>` 
+                : `<div class="banner warn">${icon("info")}<span>${errMsg || "QRIS belum tersedia."}</span></div>`;
+                
+                body += `<div class="proof"><label>Bukti pembayaran <small class="muted">(Wajib berupa screenshot)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" ${ui.proof ? "" : "hidden"} src="${ui.proof || ""}">
+                <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening" value="${ui.sender || ""}">
+                <button class="btn btn-save btn-block" type="button" id="paidBtn">${icon("task_alt")} Saya Sudah Bayar</button>
+                <small class="muted">Tekan hanya setelah transfer berhasil. Admin akan mencocokkan dengan mutasi QRIS.</small></div>`;
             }
             body += `<button class="btn btn-ghost btn-sm" type="button" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
         } else if (ui.payMethod === "CASH") {
@@ -396,7 +400,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
                 <button class="btn btn-sm ${ui.payType === 'DP_MIN' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="DP_MIN">DP Minimal</button>
                 <button class="btn btn-sm ${ui.payType === 'LUNAS' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="LUNAS">Lunas</button>
             </div>
-            <div class="pay-amount"><small>Nominal yang harus disiapkan</small><div class="nominal">${rupiah(finalAmount)}</div></div>
+            <div class="pay-amount"><small>Nominal Tagihan</small><div class="nominal">${rupiah(finalAmount)}</div></div>
             <button class="btn btn-save btn-block" type="button" id="paidCashBtn">${icon("storefront")} Konfirmasi Bayar Cash</button>
             <button class="btn btn-ghost btn-sm" type="button" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
         }
@@ -492,10 +496,6 @@ function renderDetail(secret, b, fresh, ui, draw) {
 
         $("#manualDp")?.addEventListener("input", e => {
             ui.manualAmount = parseNum(e.target.value);
-            if (ui.qrGenerated && ui.qrAmount !== ui.manualAmount) {
-                draw();
-                return;
-            }
             const warn = $("#dpWarn");
             if (warn) {
                 if (ui.manualAmount > 0 && ui.manualAmount < d) {
@@ -507,6 +507,21 @@ function renderDetail(secret, b, fresh, ui, draw) {
                 } else {
                     warn.style.display = 'none';
                 }
+            }
+
+            if (ui.qrGenerated && ui.qrAmount !== ui.manualAmount) {
+                const resBox = $("#qrResultBox");
+                if (resBox) resBox.style.display = "none";
+                let warnBox = $("#qrWarnBox");
+                if (warnBox) {
+                    warnBox.style.display = "flex";
+                    warnBox.innerHTML = `${icon("warning")}<span>Nominal berubah. QR sebelumnya menggunakan nominal <b>${rupiah(ui.qrAmount)}</b>. Klik "Tampilkan QRIS" lagi untuk memperbarui.</span>`;
+                }
+            } else if (ui.qrGenerated && ui.qrAmount === ui.manualAmount) {
+                const resBox = $("#qrResultBox");
+                if (resBox) resBox.style.display = "block";
+                let warnBox = $("#qrWarnBox");
+                if (warnBox) warnBox.style.display = "none";
             }
         });
 
