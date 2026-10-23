@@ -1,6 +1,6 @@
 import { db, doc, getDoc, onSnapshot, writeBatch, serverTimestamp } from "./fb.js";
 import {
-    $, $$, esc, toast, confirmBox, setBusy, copyText, icon, rupiah, normWA, validWA, randSecret, genKode, normKode, lookupId,
+    $, $$, esc, toast, confirmBox, setBusy, copyText, icon, rupiah, fmtNum, normWA, validWA, randSecret, genKode, normKode, lookupId,
     toMs, witaDate, witaTime, fmtDate, fmtDT, fmtCountdown, now, syncClock, pill, effStatus, mergeSettings, roomCfg, getEndMs,
     isHoliday, calcPrice, waLink, bookingLink, qrSvg, compressImage, downloadQrPng, startBackground
 } from "./lib.js";
@@ -262,7 +262,7 @@ function stepper(id, mn, mx, val) {
 function viewDetail(secret) {
     view.innerHTML = `<div class="panel center muted">Memuat booking…</div>`;
     let last = null, fresh = sessionStorage.getItem("araya_new") === secret;
-    const ui = { proof: null, sender: "", payMethod: null, payType: "DP_MIN", manualAmount: 0 };
+    const ui = { proof: null, sender: "", payMethod: null, payType: "DP_MIN", manualAmount: 0, qrGenerated: false, qrAmount: 0 };
     lastStatus = null;
     const draw = () => { if (last) renderDetail(secret, last, fresh, ui, draw); };
 
@@ -277,6 +277,8 @@ function viewDetail(secret) {
             ui.payMethod = null;
             ui.payType = "DP_MIN";
             ui.manualAmount = 0;
+            ui.qrGenerated = false;
+            ui.qrAmount = 0;
         }
         lastStatus = d.status;
 
@@ -307,7 +309,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
     if (eff === "MENUNGGU_BAYAR") {
         const d = b.dpDue || Math.round((b.total || 0) * (ST.dpPercent || 50) / 100);
         const total = b.total || 0;
-        const finalAmount = ui.payType === "LUNAS" ? total : ui.payType === "DP_MANUAL" ? ui.manualAmount : d;
+        const finalAmount = ui.payType === "LUNAS" ? total : ui.payType === "DP_MANUAL" ? ui.qrAmount : d;
 
         body += `<div class="panel pay"><h3>${icon("payments")} Pilih Metode Pembayaran</h3>
           <div class="countdown" data-cd="${b.payDeadline}">${fmtCountdown(b.payDeadline - now())}</div><p class="muted center">Batas bayar: ${esc(fmtDT(b.payDeadline))} WITA</p>`;
@@ -329,21 +331,47 @@ function renderDetail(secret, b, fresh, ui, draw) {
                 <button class="btn btn-sm ${ui.payType === 'DP_MANUAL' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="DP_MANUAL">DP Manual</button>
                 <button class="btn btn-sm ${ui.payType === 'LUNAS' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="LUNAS">Lunas</button>
             </div>
-            ${ui.payType === 'DP_MANUAL' ? `<div class="form-group" style="margin-bottom:16px;"><label>Nominal DP (Rp)</label><input id="manualDp" data-money inputmode="numeric" value="${ui.manualAmount || ''}" placeholder="Masukkan nominal..."></div>` : ''}
-            <div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(finalAmount)}</div></div>`;
-            
-            const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "";
-            if (q && q.payload && finalAmount >= d && finalAmount <= total) { try { qr = qrSvg(makeDynamic(q.payload, finalAmount)); } catch (e) { qr = ""; } }
-            body += `${qr ? `<div class="qr-box" id="payQrBox">${qr}</div>
-              <div class="row-btns" style="justify-content:center">
-                <button class="btn btn-ghost" type="button" id="dlQr">${icon("download", 16)} Unduh QR</button>
-              </div>
-              <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia atau nominal tidak valid. Hubungi admin untuk cara bayar.</span></div>`}
-              <div class="proof"><label>Bukti pembayaran <small class="muted">(Wajib berupa screenshot)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" ${ui.proof ? "" : "hidden"} src="${ui.proof || ""}">
-              <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening" value="${ui.sender || ""}">
-              <button class="btn btn-save btn-block" type="button" id="paidBtn" ${(finalAmount < d || finalAmount > total) ? 'disabled' : ''}>${icon("task_alt")} Saya Sudah Bayar</button>
-              <small class="muted">Tekan hanya setelah transfer berhasil. Admin akan mencocokkan dengan mutasi QRIS.</small></div>
-              <button class="btn btn-ghost btn-sm" type="button" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
+            ${ui.payType === 'DP_MANUAL' ? `
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Nominal DP (Rp)</label>
+                    <input id="manualDp" data-money inputmode="numeric" value="${ui.manualAmount ? fmtNum(ui.manualAmount) : ''}" placeholder="Minimal ${rupiah(d)}">
+                </div>
+                <button class="btn btn-ghost btn-block" type="button" id="btnGenQr" style="margin-bottom:16px;">${icon("qr_code_2")} Tampilkan QRIS</button>
+            ` : ''}
+            `;
+
+            if (ui.payType === 'DP_MANUAL') {
+                if (!ui.qrGenerated) {
+                    body += `<div class="banner warn" style="justify-content:center;">${icon("info")}<span>Masukkan nominal, lalu klik "Tampilkan QRIS".</span></div>`;
+                } else if (ui.qrAmount !== ui.manualAmount) {
+                    body += `<div class="banner warn" style="justify-content:center; flex-direction:column;">
+                                ${icon("warning")}<span>Nominal berubah. QR di bawah ini masih menggunakan nominal <b>${rupiah(ui.qrAmount)}</b>. Klik tombol di atas untuk memperbarui.</span>
+                            </div>`;
+                }
+            }
+
+            const displayAmount = ui.payType === 'DP_MANUAL' ? ui.qrAmount : finalAmount;
+            const isQrValid = displayAmount >= d && displayAmount <= total;
+
+            if (!ui.qrGenerated && ui.payType === 'DP_MANUAL') {
+                // Do nothing, the banner above handles it
+            } else {
+                body += `<div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(displayAmount)}</div></div>`;
+                
+                const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "";
+                if (q && q.payload && isQrValid) { try { qr = qrSvg(makeDynamic(q.payload, displayAmount)); } catch (e) { qr = ""; } }
+                
+                body += `${qr ? `<div class="qr-box" id="payQrBox">${qr}</div>
+                  <div class="row-btns" style="justify-content:center">
+                    <button class="btn btn-ghost" type="button" id="dlQr">${icon("download", 16)} Unduh QR</button>
+                  </div>
+                  <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia atau nominal tidak valid. Hubungi admin untuk cara bayar.</span></div>`}
+                  <div class="proof"><label>Bukti pembayaran <small class="muted">(Wajib berupa screenshot)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" ${ui.proof ? "" : "hidden"} src="${ui.proof || ""}">
+                  <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening" value="${ui.sender || ""}">
+                  <button class="btn btn-save btn-block" type="button" id="paidBtn" ${!isQrValid ? 'disabled' : ''}>${icon("task_alt")} Saya Sudah Bayar</button>
+                  <small class="muted">Tekan hanya setelah transfer berhasil. Admin akan mencocokkan dengan mutasi QRIS.</small></div>`;
+            }
+            body += `<button class="btn btn-ghost btn-sm" type="button" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
         } else if (ui.payMethod === "CASH") {
             body += `<div class="kv total"><span>Total Tagihan</span><b>${rupiah(total)}</b></div>
             <div class="kv"><span>Minimal DP (${ST.dpPercent}%)</span><b>${rupiah(d)}</b></div>
@@ -434,34 +462,32 @@ function renderDetail(secret, b, fresh, ui, draw) {
     if (eff === "MENUNGGU_BAYAR") {
         const d = b.dpDue || Math.round((b.total || 0) * (ST.dpPercent || 50) / 100);
         const total = b.total || 0;
-        const finalAmount = ui.payType === "LUNAS" ? total : ui.payType === "DP_MANUAL" ? ui.manualAmount : d;
 
         $("#pickQris")?.addEventListener("click", () => { ui.payMethod = "QRIS"; draw(); });
         $("#pickCash")?.addEventListener("click", () => { ui.payMethod = "CASH"; draw(); });
-        $("#backMethod")?.addEventListener("click", () => { ui.payMethod = null; ui.payType = "DP_MIN"; draw(); });
+        $("#backMethod")?.addEventListener("click", () => { ui.payMethod = null; ui.payType = "DP_MIN"; ui.qrGenerated = false; draw(); });
 
         $$("[data-pt]").forEach(btn => btn.addEventListener("click", () => {
             ui.payType = btn.dataset.pt;
+            if (ui.payType !== "DP_MANUAL") ui.qrGenerated = true;
+            else ui.qrGenerated = false;
             draw();
         }));
 
         $("#manualDp")?.addEventListener("input", e => {
             ui.manualAmount = parseNum(e.target.value);
-            const el = $("#nominal");
-            if (el) el.textContent = rupiah(ui.manualAmount);
-            const svgBox = $("#payQrBox");
-            if (svgBox) {
-                const q = QRC[b.lokasi] || QRC.DEFAULT;
-                if (q && q.payload) {
-                    try {
-                        const amt = ui.manualAmount;
-                        if (amt >= d && amt <= total) svgBox.innerHTML = qrSvg(makeDynamic(q.payload, amt));
-                        else svgBox.innerHTML = `<div class="banner warn" style="margin:0">Nominal tidak valid (Min: ${rupiah(d)})</div>`;
-                    } catch (err) { svgBox.innerHTML = ""; }
+            if (ui.qrGenerated && ui.qrAmount !== ui.manualAmount) {
+                const warnBox = $("#payQrBox")?.previousElementSibling;
+                if (warnBox && warnBox.classList.contains("banner")) {
+                    warnBox.innerHTML = `<div class="banner warn" style="justify-content:center; flex-direction:column;">${icon("warning")}<span>Nominal berubah. QR di bawah ini masih menggunakan nominal <b>${rupiah(ui.qrAmount)}</b>. Klik tombol di atas untuk memperbarui.</span></div>`;
                 }
             }
-            const btn = $("#paidBtn");
-            if (btn) btn.disabled = (ui.manualAmount < d || ui.manualAmount > total);
+        });
+
+        $("#btnGenQr")?.addEventListener("click", () => {
+            ui.qrGenerated = true;
+            ui.qrAmount = ui.manualAmount;
+            draw();
         });
 
         $("#proofFile")?.addEventListener("change", async e => {
@@ -478,7 +504,8 @@ function renderDetail(secret, b, fresh, ui, draw) {
 
         $("#paidBtn")?.addEventListener("click", async e => {
             const btn = e.currentTarget;
-            if (finalAmount < d || finalAmount > total) return toast(`Nominal DP manual harus antara ${rupiah(d)} dan ${rupiah(total)}`, "error");
+            const amtToPay = ui.payType === 'DP_MANUAL' ? ui.qrAmount : (ui.payType === 'LUNAS' ? total : d);
+            if (amtToPay < d || amtToPay > total) return toast(`Nominal harus antara ${rupiah(d)} dan ${rupiah(total)}`, "error");
             if (!ui.proof) return toast("Wajib melampirkan bukti pembayaran (screenshot)!", "error");
             if (!await confirmBox("Kirim konfirmasi bayar?", "Pastikan transfer sudah berhasil sebelum melanjutkan.", "Kirim")) return;
             setBusy(btn, true, "Mengirim…");
@@ -490,7 +517,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
                     sender: (ui.sender || "").slice(0, 40), 
                     dpMethod: "QRIS",
                     paymentType: ui.payType,
-                    payAmount: finalAmount,
+                    payAmount: amtToPay,
                     upd: serverTimestamp() 
                 });
                 batch.set(doc(db, "proofs", secret), { img: ui.proof, at: now() });
@@ -500,6 +527,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
 
         $("#paidCashBtn")?.addEventListener("click", async e => {
             const btn = e.currentTarget;
+            const amtToPay = ui.payType === 'LUNAS' ? total : d;
             if (!await confirmBox("Konfirmasi Bayar Cash?", "Pastikan Anda sudah membayar di kasir sebelum menekan tombol ini.", "Ya, Konfirmasi")) return;
             setBusy(btn, true, "Memproses…");
             try {
@@ -508,7 +536,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
                     status: "MENUNGGU_VERIFIKASI",
                     dpMethod: "CASH",
                     paymentType: ui.payType,
-                    payAmount: finalAmount,
+                    payAmount: amtToPay,
                     paidReportedAt: now(),
                     upd: serverTimestamp()
                 });
