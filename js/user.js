@@ -184,7 +184,11 @@ function viewForm() {
         const v = rd(), box = $("#f-slots"), my = ++slotToken;
         if (!v.lokasi || !v.room || !v.tanggal || !v.durasi) { box.innerHTML = `<p class="hint">Pilih lokasi, room, dan tanggal dulu.</p>`; return; }
         const hol = isHoliday(ST, v.lokasi, v.tanggal);
-        if (hol) { jam = null; box.innerHTML = `<div class="banner warn">${icon("event_busy")}<span>Tutup pada tanggal ini${hol.alasan ? ": " + esc(hol.alasan) : ""}. Pilih tanggal lain.</span></div>`; return; }
+        if (hol) { 
+            jam = null; 
+            box.innerHTML = `<div class="banner warn">${icon("event_busy")}<span>Kami tutup di tanggal tersebut karena ${hol.alasan ? esc(hol.alasan) : "ada acara"}. Mohon pilih tanggal lain.</span></div>`; 
+            return; 
+        }
         box.innerHTML = `<p class="hint">Memuat jam tersedia…</p>`;
         const ranges = await rangesForDay(v.lokasi, v.room, v.tanggal);
         if (my !== slotToken) return;
@@ -316,10 +320,10 @@ function renderDetail(secret, b, fresh, ui, draw) {
 
         if (!ui.payMethod) {
             body += `<div class="form-grid" style="margin-top:16px; gap: 12px;">
-                <button class="btn btn-save" type="button" id="pickQris" style="flex-direction:column; padding:14px 10px; height:auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3); background: linear-gradient(135deg, #8b5cf6, #ec4899); background-size: 200% auto; animation: shimmer 3s linear infinite;">
+                <button class="btn btn-save" type="button" id="pickQris" style="flex-direction:column; padding:14px 10px; height:auto; border-radius: 0; clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3); background: linear-gradient(135deg, #8b5cf6, #ec4899); background-size: 200% auto; animation: shimmer 3s linear infinite;">
                     ${icon("qr_code_2", 28)}<br><b style="font-size:15px; margin-top:4px;">QRIS</b>
                 </button>
-                <button class="btn btn-save" type="button" id="pickCash" style="flex-direction:column; padding:14px 10px; height:auto; border-radius: 8px; background: linear-gradient(135deg, #10b981, #3b82f6); background-size: 200% auto; animation: shimmer 3s linear infinite;">
+                <button class="btn btn-save" type="button" id="pickCash" style="flex-direction:column; padding:14px 10px; height:auto; border-radius: 0; clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px); background: linear-gradient(135deg, #10b981, #3b82f6); background-size: 200% auto; animation: shimmer 3s linear infinite;">
                     ${icon("payments", 28)}<br><b style="font-size:15px; margin-top:4px;">CASH</b>
                 </button>
             </div>`;

@@ -79,7 +79,7 @@ async function startApp(user) {
     try { const s = await getDoc(doc(db, "config", "qris")); if (s.exists()) S.qris = s.data(); } catch (e) { }
 
     root.innerHTML = `<div class="admin-bar">
-      <div class="admin-user">
+      <div class="admin-user" style="border-radius: 0; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);">
         <span class="material-icons-round">account_circle</span>
         <span class="admin-email">${esc(user.email)}</span>
       </div>
@@ -302,7 +302,7 @@ async function run(fn, ok) {
 
 function conflictModal(cs) {
     const rows = cs.map(r => { const o = S.byBid.get(r.bid); return `<li>${esc(fmtDT(r.s))}–${esc(witaTime(r.e))} · ${esc(r.k)}${o ? " · " + esc(o.nama) : ""}</li>`; }).join("");
-    modal(`<div class="modal-icon"><span class="material-icons-round">warning</span></div><h3>Slot sudah terisi</h3><p>Tidak bisa diproses karena bentrok dengan:</p><ul style="margin:8px 0 16px 18px; text-align:left; line-height:1.6;">${rows}</ul><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`, { wide: false });
+    modal(`<div class="modal-icon"><span class="material-icons-round">warning</span></div><h3>Slot sudah terisi</h3><p>Tidak bisa diproses karena bentrok dengan:</p><ul style="margin:8px 0 16px 0; padding:0; text-align:center; list-style-position:inside; line-height:1.6;">${rows}</ul><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`, { wide: false });
 }
 
 const changeStatus = (b, patch, { release = false, add = null } = {}) => {
