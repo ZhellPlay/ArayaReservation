@@ -617,14 +617,14 @@ function editModal(b) {
             upd: serverTimestamp()
         };
 
-        // VALIDASI HARI LIBUR DI MODE EDIT
+        // 1. VALIDASI HARI LIBUR (Tampilkan Modal Peringatan)
         const hol = isHoliday(S.st, patch.lokasi, patch.tanggal);
         if (hol) {
-            toast(`Di tanggal tersebut tutup karena ${hol.alasan ? hol.alasan : "ada acara"}. Mohon pilih tanggal lain.`, "error");
-            return; // Hentikan proses, modal tidak tertutup
+            modal(`<div class="modal-icon"><span class="material-icons-round">event_busy</span></div><h3>Tanggal Libur</h3><p>Di tanggal tersebut tutup karena <b>${esc(hol.alasan || "ada acara")}</b>. Mohon pilih tanggal lain.</p><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`, { wide: false });
+            return; // Hentikan proses, modal edit tetap terbuka
         }
 
-        // VALIDASI BENTROK DI MODE EDIT (Cek ke data lokal dulu)
+        // 2. VALIDASI BENTROK (Tampilkan Modal Peringatan)
         const clash = S.bookings.find(o => 
             o.id !== b.id && 
             o.lokasi === patch.lokasi && 
@@ -634,8 +634,8 @@ function editModal(b) {
         );
 
         if (clash) {
-            toast(`Slot bentrok dengan booking ${clash.nama} (${clash.jamMulai} - ${witaTime(clash.endMs)}).`, "error");
-            return; // Hentikan proses, modal tidak tertutup
+            modal(`<div class="modal-icon"><span class="material-icons-round">warning</span></div><h3>Slot sudah terisi</h3><p>Tidak bisa menyimpan. Slot bentrok dengan booking <b>${esc(clash.nama)}</b> (${esc(clash.jamMulai)} - ${esc(witaTime(clash.endMs))}).</p><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`, { wide: false });
+            return; // Hentikan proses, modal edit tetap terbuka
         }
 
         if (!b.tipe || b.tipe === "ONLINE") {
