@@ -303,7 +303,14 @@ function renderDetail(secret, b, fresh, ui, draw) {
     const stage = { PENDING: 0, MENUNGGU_BAYAR: 1, MENUNGGU_VERIFIKASI: 2, TERKONFIRMASI: 3, CHECKED_IN: 3, SELESAI: 3 }[eff];
     const names = ["Diajukan", "Disetujui", "Dibayar", "Siap main"];
     const stepsHtml = stage === undefined ? "" : `<div class="steps">${names.map((n, i) => `<div class="step ${i < stage ? "done" : i === stage ? "now" : ""}"><i></i><span>${n}</span></div>`).join("")}</div>`;
-    const adminWA = ST.adminWA ? waLink(ST.adminWA, `Halo admin, saya *${b.nama}*. Mohon konfirmasi booking saya dengan kode *${b.kode}* untuk tanggal ${fmtDate(b.tanggal, false)} jam ${b.jamMulai}. Terima kasih.`) : "";
+    
+    // --- LOGIKA DINAMIS PESAN WA ADMIN ---
+    const isEarlyStage = ["PENDING", "MENUNGGU_BAYAR"].includes(eff);
+    const waText = isEarlyStage 
+        ? `Halo admin, saya *${b.nama}* (Kode: *${b.kode}*). Mohon konfirmasi booking saya untuk tanggal ${fmtDate(b.tanggal, false)} jam ${b.jamMulai}. Terima kasih.`
+        : `Halo admin, saya *${b.nama}* (Kode: *${b.kode}*). Saya ingin mengubah jadwal / bertanya mengenai booking saya untuk tanggal ${fmtDate(b.tanggal, false)} jam ${b.jamMulai}. Terima kasih.`;
+    const adminWA = ST.adminWA ? waLink(ST.adminWA, waText) : "";
+
     let body = "";
 
     if (fresh) body += `<div class="banner ok">${icon("check_circle")}<div><b>Permintaan terkirim!</b><br>Simpan link halaman ini. Kamu juga bisa kembali kapan saja pakai <b>kode ${esc(b.kode)}</b> + nomor WA.</div></div>`;
@@ -413,7 +420,18 @@ function renderDetail(secret, b, fresh, ui, draw) {
 
     if (eff === "HANGUS" && b.status === "MENUNGGU_BAYAR") body += `<div class="panel"><h3>${icon("timer_off")} Waktu pembayaran habis</h3><p class="muted center">Slot dilepas. Kalau kamu <b>sudah terlanjur transfer</b>, segera hubungi admin dengan kode ${esc(b.kode)}.</p></div>`;
     else if (eff === "HANGUS") body += `<div class="panel"><h3>${icon("timer_off")} Permintaan hangus</h3><p class="muted center">Admin belum sempat memproses atau kamu melewati batas waktu. Kamu bisa mengajukan lagi.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
-    if (eff === "MENUNGGU_VERIFIKASI") body += `<div class="panel"><h3>${icon("fact_check")} Pembayaran sedang diverifikasi</h3><p class="muted center">Terima kasih! Admin sedang mencocokkan pembayaranmu. Tidak perlu bayar lagi.</p></div>`;
+    
+    // --- STATUS MENUNGGU VERIFIKASI (DIBEDAKAN QRIS & CASH) ---
+    if (eff === "MENUNGGU_VERIFIKASI") {
+        const isCash = b.dpMethod === "CASH";
+        body += `<div class="panel">
+            <h3>${icon("fact_check")} ${isCash ? "Konfirmasi Pembayaran CASH" : "Pembayaran sedang diverifikasi"}</h3>
+            <p class="muted center">${isCash 
+                ? "Anda memilih metode pembayaran CASH. Jika ingin mengubah hari/tanggal atau ada kendala, silakan hubungi WA Admin di bawah."
+                : "Terima kasih! Admin sedang mencocokkan bukti pembayaranmu. Jika ingin mengubah hari/tanggal, silakan hubungi WA Admin di bawah."
+            }</p>
+        </div>`;
+    }
     
     if (eff === "TERKONFIRMASI" || eff === "CHECKED_IN") {
         body += `<div class="panel ok"><h3>${icon(eff === "CHECKED_IN" ? "sports_esports" : "verified")} ${eff === "CHECKED_IN" ? "Selamat bermain!" : "Booking terkonfirmasi"}</h3>`;
@@ -602,7 +620,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
                     upd: serverTimestamp() 
                 });
                 batch.set(doc(db, "proofs", secret), { img: ui.proof, at: now() });
-                await batch.commit(); toast("Terkirim! Admin akan memverifikasi.", "success");
+                await batch.commit(); toast("Terkirim! Admin akan memverifikasi bukti pembayaranmu.", "success");
             } catch (x) { console.error(x); toast("Gagal mengirim. Mungkin batas waktu sudah lewat, hubungi admin.", "error"); setBusy(btn, false); }
         });
 
@@ -622,7 +640,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
                     upd: serverTimestamp()
                 });
                 await batch.commit();
-                toast("Terkonfirmasi! Menunggu admin memverifikasi pembayaran cash Anda.", "success");
+                toast("Terkonfirmasi! Metode pembayaran CASH telah dipilih.", "success");
             } catch (x) { console.error(x); toast("Gagal mengirim.", "error"); setBusy(btn, false); }
         });
     }
