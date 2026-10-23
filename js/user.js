@@ -332,11 +332,14 @@ function renderDetail(secret, b, fresh, ui, draw) {
                 <button class="btn btn-sm ${ui.payType === 'LUNAS' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="LUNAS">Lunas</button>
             </div>
             ${ui.payType === 'DP_MANUAL' ? `
-                <div class="form-group" style="margin-bottom:12px;">
+                <div class="form-group" style="margin-bottom:8px;">
                     <label>Nominal DP (Rp)</label>
                     <input id="manualDp" data-money inputmode="numeric" value="${ui.manualAmount ? fmtNum(ui.manualAmount) : ''}" placeholder="Minimal ${rupiah(d)}">
+                    <small class="hint" id="dpWarn" style="color:var(--danger); display:${(ui.manualAmount > 0 && ui.manualAmount < d) || ui.manualAmount > total ? 'block' : 'none'}; margin-top:4px;">
+                        ${ui.manualAmount > 0 && ui.manualAmount < d ? `Minimal DP adalah ${rupiah(d)}` : ui.manualAmount > total ? `Maksimal adalah ${rupiah(total)} (Lunas)` : ''}
+                    </small>
                 </div>
-                <button class="btn btn-ghost btn-block" type="button" id="btnGenQr" style="margin-bottom:16px;">${icon("qr_code_2")} Tampilkan QRIS</button>
+                <button class="btn btn-ghost btn-block" type="button" id="btnGenQr" style="margin-bottom:16px;" ${(ui.manualAmount < d || ui.manualAmount > total) ? 'disabled' : ''}>${icon("qr_code_2")} Tampilkan QRIS</button>
             ` : ''}
             `;
 
@@ -476,6 +479,22 @@ function renderDetail(secret, b, fresh, ui, draw) {
 
         $("#manualDp")?.addEventListener("input", e => {
             ui.manualAmount = parseNum(e.target.value);
+            const warn = $("#dpWarn");
+            const btn = $("#btnGenQr");
+            if (warn) {
+                if (ui.manualAmount > 0 && ui.manualAmount < d) {
+                    warn.textContent = `Minimal DP adalah ${rupiah(d)}`;
+                    warn.style.display = 'block';
+                    if (btn) btn.disabled = true;
+                } else if (ui.manualAmount > total) {
+                    warn.textContent = `Maksimal adalah ${rupiah(total)} (Lunas)`;
+                    warn.style.display = 'block';
+                    if (btn) btn.disabled = true;
+                } else {
+                    warn.style.display = 'none';
+                    if (btn) btn.disabled = false;
+                }
+            }
             if (ui.qrGenerated && ui.qrAmount !== ui.manualAmount) {
                 const warnBox = $("#payQrBox")?.previousElementSibling;
                 if (warnBox && warnBox.classList.contains("banner")) {
@@ -485,8 +504,9 @@ function renderDetail(secret, b, fresh, ui, draw) {
         });
 
         $("#btnGenQr")?.addEventListener("click", () => {
+            const val = parseNum($("#manualDp").value);
             ui.qrGenerated = true;
-            ui.qrAmount = ui.manualAmount;
+            ui.qrAmount = val;
             draw();
         });
 
