@@ -141,7 +141,7 @@ function viewForm() {
       <div class="form-group full-width"><label>Catatan</label><textarea id="f-catatan" rows="2" maxlength="300" placeholder="Opsional" style="resize:vertical"></textarea></div>
       <div class="form-group full-width"><div class="est" id="f-est"></div></div>
     </div>
-    <div class="form-actions"><button class="btn btn-save" id="f-submit">${icon("send")} Ajukan Booking</button></div>
+    <div class="form-actions"><button class="btn btn-save" type="button" id="f-submit">${icon("send")} Ajukan Booking</button></div>
     <p class="muted center" style="margin-top:14px">Mengajukan ≠ dapat slot. Slot dikunci setelah admin menyetujui.</p>
     <div class="row-btns" style="margin-top:16px"><a href="#/" class="btn btn-ghost btn-block">${icon("arrow_back")} Kembali</a></div>
     </div>`;
@@ -264,7 +264,7 @@ function viewDetail(secret) {
     let last = null, fresh = sessionStorage.getItem("araya_new") === secret;
     const ui = { proof: null, sender: "", payMethod: null, payType: "DP_MIN", manualAmount: 0 };
     lastStatus = null;
-    const draw = () => { if (last) renderDetail(secret, last, fresh, ui); };
+    const draw = () => { if (last) renderDetail(secret, last, fresh, ui, draw); };
 
     unsub = onSnapshot(doc(db, "bookings", secret), s => {
         if (!s.exists()) { view.innerHTML = `<div class="panel center"><span class="material-icons-round big">link_off</span><h3>Booking tidak ditemukan</h3><p class="muted">Link salah, atau booking sudah dihapus admin.</p><p><a class="btn btn-ghost" href="#/find">Cari pakai kode</a> <a class="btn btn-ghost" href="#/">Beranda</a></p></div>`; forget(secret); return; }
@@ -291,7 +291,7 @@ function viewDetail(secret) {
     }, 1000);
 }
 
-function renderDetail(secret, b, fresh, ui) {
+function renderDetail(secret, b, fresh, ui, draw) {
     const eff = effStatus(b, ST), link = bookingLink(secret), r = roomCfg(ST, b.lokasi, b.room);
     const extra = r ? Math.max(0, b.orang - r.baseCap) : 0;
     const stage = { PENDING: 0, MENUNGGU_BAYAR: 1, MENUNGGU_VERIFIKASI: 2, TERKONFIRMASI: 3, CHECKED_IN: 3, SELESAI: 3 }[eff];
@@ -314,10 +314,10 @@ function renderDetail(secret, b, fresh, ui) {
 
         if (!ui.payMethod) {
             body += `<div class="form-grid" style="margin-top:16px">
-                <button class="btn btn-save" id="pickQris" style="flex-direction:column; padding:20px; height:auto;">
+                <button class="btn btn-save" type="button" id="pickQris" style="flex-direction:column; padding:20px; height:auto;">
                     ${icon("qr_code_2", 32)}<br><b style="font-size:16px; margin-top:8px;">QRIS</b><br><small>Transfer / E-Wallet</small>
                 </button>
-                <button class="btn btn-ghost" id="pickCash" style="flex-direction:column; padding:20px; height:auto;">
+                <button class="btn btn-ghost" type="button" id="pickCash" style="flex-direction:column; padding:20px; height:auto;">
                     ${icon("payments", 32)}<br><b style="font-size:16px; margin-top:8px;">CASH</b><br><small>Bayar di Kasir</small>
                 </button>
             </div>`;
@@ -325,36 +325,36 @@ function renderDetail(secret, b, fresh, ui) {
             body += `<div class="kv total"><span>Total Tagihan</span><b>${rupiah(total)}</b></div>
             <div class="kv"><span>Minimal DP (${ST.dpPercent}%)</span><b>${rupiah(d)}</b></div>
             <div class="row-btns" style="margin-bottom:16px; gap:8px; justify-content:center;">
-                <button class="btn btn-sm ${ui.payType === 'DP_MIN' ? 'btn-save' : 'btn-ghost'}" data-pt="DP_MIN">DP Minimal</button>
-                <button class="btn btn-sm ${ui.payType === 'DP_MANUAL' ? 'btn-save' : 'btn-ghost'}" data-pt="DP_MANUAL">DP Manual</button>
-                <button class="btn btn-sm ${ui.payType === 'LUNAS' ? 'btn-save' : 'btn-ghost'}" data-pt="LUNAS">Lunas</button>
+                <button class="btn btn-sm ${ui.payType === 'DP_MIN' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="DP_MIN">DP Minimal</button>
+                <button class="btn btn-sm ${ui.payType === 'DP_MANUAL' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="DP_MANUAL">DP Manual</button>
+                <button class="btn btn-sm ${ui.payType === 'LUNAS' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="LUNAS">Lunas</button>
             </div>
             ${ui.payType === 'DP_MANUAL' ? `<div class="form-group" style="margin-bottom:16px;"><label>Nominal DP (Rp)</label><input id="manualDp" data-money inputmode="numeric" value="${ui.manualAmount || ''}" placeholder="Masukkan nominal..."></div>` : ''}
             <div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(finalAmount)}</div></div>`;
             
             const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "";
-            if (q && q.payload && finalAmount > 0) { try { qr = qrSvg(makeDynamic(q.payload, finalAmount)); } catch (e) { qr = ""; } }
+            if (q && q.payload && finalAmount >= d && finalAmount <= total) { try { qr = qrSvg(makeDynamic(q.payload, finalAmount)); } catch (e) { qr = ""; } }
             body += `${qr ? `<div class="qr-box" id="payQrBox">${qr}</div>
               <div class="row-btns" style="justify-content:center">
-                <button class="btn btn-ghost" id="dlQr">${icon("download", 16)} Unduh QR</button>
+                <button class="btn btn-ghost" type="button" id="dlQr">${icon("download", 16)} Unduh QR</button>
               </div>
-              <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia. Hubungi admin untuk cara bayar.</span></div>`}
+              <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia atau nominal tidak valid. Hubungi admin untuk cara bayar.</span></div>`}
               <div class="proof"><label>Bukti pembayaran <small class="muted">(Wajib berupa screenshot)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" ${ui.proof ? "" : "hidden"} src="${ui.proof || ""}">
               <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening" value="${ui.sender || ""}">
-              <button class="btn btn-save btn-block" id="paidBtn" ${finalAmount <= 0 ? 'disabled' : ''}>${icon("task_alt")} Saya Sudah Bayar</button>
+              <button class="btn btn-save btn-block" type="button" id="paidBtn" ${(finalAmount < d || finalAmount > total) ? 'disabled' : ''}>${icon("task_alt")} Saya Sudah Bayar</button>
               <small class="muted">Tekan hanya setelah transfer berhasil. Admin akan mencocokkan dengan mutasi QRIS.</small></div>
-              <button class="btn btn-ghost btn-sm" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
+              <button class="btn btn-ghost btn-sm" type="button" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
         } else if (ui.payMethod === "CASH") {
             body += `<div class="kv total"><span>Total Tagihan</span><b>${rupiah(total)}</b></div>
             <div class="kv"><span>Minimal DP (${ST.dpPercent}%)</span><b>${rupiah(d)}</b></div>
             <p class="muted center">Silakan pilih Anda mau bayar DP atau Lunas di kasir. Admin akan mengonfirmasi nominal yang Anda bayarkan.</p>
             <div class="row-btns" style="margin-bottom:16px; gap:8px; justify-content:center;">
-                <button class="btn btn-sm ${ui.payType === 'DP_MIN' ? 'btn-save' : 'btn-ghost'}" data-pt="DP_MIN">DP Minimal</button>
-                <button class="btn btn-sm ${ui.payType === 'LUNAS' ? 'btn-save' : 'btn-ghost'}" data-pt="LUNAS">Lunas</button>
+                <button class="btn btn-sm ${ui.payType === 'DP_MIN' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="DP_MIN">DP Minimal</button>
+                <button class="btn btn-sm ${ui.payType === 'LUNAS' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="LUNAS">Lunas</button>
             </div>
             <div class="pay-amount"><small>Nominal yang harus disiapkan</small><div class="nominal">${rupiah(finalAmount)}</div></div>
-            <button class="btn btn-save btn-block" id="paidCashBtn">${icon("storefront")} Konfirmasi Bayar Cash</button>
-            <button class="btn btn-ghost btn-sm" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
+            <button class="btn btn-save btn-block" type="button" id="paidCashBtn">${icon("storefront")} Konfirmasi Bayar Cash</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
         }
         body += `</div>`;
     }
@@ -381,13 +381,13 @@ function renderDetail(secret, b, fresh, ui) {
     if (eff === "SELESAI") body += `<div class="panel center"><h3>${icon("celebration")} Terima kasih sudah main!</h3><p class="muted">Sampai ketemu lagi di ARAYA GAMESTATION.</p><a class="btn btn-save btn-block" href="#/new">${icon("add_circle", 16)} Booking Lagi</a></div>`;
     if (eff === "DITOLAK") {
         body += `<div class="panel bad"><h3>${icon("cancel")} Belum bisa diproses</h3><p class="center">${esc(b.rejectReason || "Jadwal tidak tersedia.")}</p>
-        <button class="btn btn-save btn-block" id="retryBtn">${icon("refresh")} Sesuaikan & Ajukan Ulang</button></div>`;
+        <button class="btn btn-save btn-block" type="button" id="retryBtn">${icon("refresh")} Sesuaikan & Ajukan Ulang</button></div>`;
     }
     if (eff === "DIBATALKAN") body += `<div class="panel"><h3>${icon("block")} Booking dibatalkan</h3></div>`;
     if (b.payNote && eff === "MENUNGGU_BAYAR") body += `<div class="banner warn">${icon("report")}<span>Catatan admin: ${esc(b.payNote)}</span></div>`;
 
     const method = b.dpMethod === "CASH" ? "Cash" : b.dpMethod === "QRIS" ? "QRIS" : "-";
-    const money = b.total ? `<div class="kv"><span>Total</span><b>${rupiah(b.total)}</b></div><div class="kv"><span>Metode DP</span><b>${method}</b></div><div class="kv"><span>DP${b.dpMethod === "CASH" ? " (Cash)" : ""}</span><b>${rupiah(b.dpDue)}</b></div>${b.dpPaid ? `<div class="kv"><span>DP diterima</span><b class="okc">${rupiah(b.dpPaid)}</b></div>` : ""}` : b.estTotal ? `<div class="kv"><span>Estimasi total</span><b>${rupiah(b.estTotal)}</b></div>` : "";
+    const money = b.total ? `<div class="kv"><span>Total</span><b>${rupiah(b.total)}</b></div><div class="kv"><span>Metode DP</span><b>${method}</b></div><div class="kv"><span>DP${b.dpMethod === "CASH" ? " (Cash)" : ""}</span><b>${rupiah(b.dpDue)}</b></div>${b.dpPaid ? `<div class="kv"><span>${b.dpPaid >= (b.total || 0) ? 'Lunas' : 'DP diterima'}</span><b class="okc">${rupiah(b.dpPaid)}</b></div>` : ""}` : b.estTotal ? `<div class="kv"><span>Estimasi total</span><b>${rupiah(b.estTotal)}</b></div>` : "";
     const canCancel = ["PENDING", "MENUNGGU_BAYAR"].includes(eff);
 
     view.innerHTML = `<div class="detail-head"><a href="#/" class="btn btn-ghost btn-sm">${icon("arrow_back", 16)} Beranda</a>${pill(eff)}</div>
@@ -401,11 +401,11 @@ function renderDetail(secret, b, fresh, ui) {
       <div class="kv"><span>Atas nama</span><b>${esc(b.nama)}</b></div>${b.catatan ? `<div class="kv"><span>Catatan</span><b>${esc(b.catatan)}</b></div>` : ""}${money}</div>
     <div class="panel"><h3>${icon("bookmark")} Akses Booking &amp; Bantuan</h3><p class="muted">Simpan link ini agar kamu bisa mengecek status booking kapan saja. Jika link hilang atau butuh bantuan, silakan hubungi admin via WhatsApp untuk mempercepat konfirmasi.</p>
       <div class="row-btns" style="justify-content: center; gap: 12px;">
-        <button class="btn btn-ghost" id="copyLink">${icon("link", 16)} Salin Link</button>
+        <button class="btn btn-ghost" type="button" id="copyLink">${icon("link", 16)} Salin Link</button>
         ${adminWA ? `<a class="btn btn-wa" target="_blank" rel="noopener" href="${adminWA}">${icon("support_agent", 16)} WA Admin</a>` : ""}
       </div>
     </div>
-    ${canCancel ? `<button class="btn btn-delete btn-block" id="cancelBtn">${icon("close", 16)} Batalkan booking</button>` : ""}
+    ${canCancel ? `<button class="btn btn-delete btn-block" type="button" id="cancelBtn">${icon("close", 16)} Batalkan booking</button>` : ""}
     <p class="muted center" style="margin-top:14px">${esc(ST.policy)}</p>`;
 
     if (fresh) sessionStorage.removeItem("araya_new");
@@ -460,6 +460,8 @@ function renderDetail(secret, b, fresh, ui) {
                     } catch (err) { svgBox.innerHTML = ""; }
                 }
             }
+            const btn = $("#paidBtn");
+            if (btn) btn.disabled = (ui.manualAmount < d || ui.manualAmount > total);
         });
 
         $("#proofFile")?.addEventListener("change", async e => {
@@ -501,7 +503,8 @@ function renderDetail(secret, b, fresh, ui) {
             if (!await confirmBox("Konfirmasi Bayar Cash?", "Pastikan Anda sudah membayar di kasir sebelum menekan tombol ini.", "Ya, Konfirmasi")) return;
             setBusy(btn, true, "Memproses…");
             try {
-                await updateDoc(doc(db, "bookings", secret), {
+                const batch = writeBatch(db);
+                batch.update(doc(db, "bookings", secret), {
                     status: "MENUNGGU_VERIFIKASI",
                     dpMethod: "CASH",
                     paymentType: ui.payType,
@@ -509,6 +512,7 @@ function renderDetail(secret, b, fresh, ui) {
                     paidReportedAt: now(),
                     upd: serverTimestamp()
                 });
+                await batch.commit();
                 toast("Terkonfirmasi! Menunggu admin memverifikasi pembayaran cash Anda.", "success");
             } catch (x) { console.error(x); toast("Gagal mengirim.", "error"); setBusy(btn, false); }
         });
