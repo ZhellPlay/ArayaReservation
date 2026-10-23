@@ -177,7 +177,7 @@ function viewForm() {
           ${p.extraN ? `<div class="kv"><span>${p.extraN} orang tambahan${ST.addonPerHour ? ` × ${v.durasi} jam` : ""}</span><b>${rupiah(p.extra)}</b></div>` : ""}
           ${v.mic ? `<div class="kv"><span>${v.mic} mic${ST.micPerHour ? ` × ${v.durasi} jam` : ""}</span><b>${rupiah(p.micT)}</b></div>` : ""}
           <div class="kv"><span>Estimasi total</span><b>${rupiah(p.total)}</b></div>
-          <div class="kv highlight"><span>DP Minimal (${ST.dpPercent}%)</span><b>${rupiah(p.dp)}</b></div>
+          <div class="kv highlight"><span>Minimal DP (${ST.dpPercent}%)</span><b>${rupiah(p.dp)}</b></div>
           <small class="hint">Angka final dikonfirmasi admin.</small>` : `<small class="hint">Tarif akan dikonfirmasi admin saat booking disetujui.</small>`;
     };
     const slots = async () => {
@@ -316,21 +316,21 @@ function renderDetail(secret, b, fresh, ui, draw) {
 
         if (!ui.payMethod) {
             body += `<div class="form-grid" style="margin-top:16px; gap: 12px;">
-                <button class="btn btn-save" type="button" id="pickQris" style="flex-direction:column; padding:14px; height:auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">
+                <button class="btn btn-save" type="button" id="pickQris" style="flex-direction:column; padding:14px 10px; height:auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3); background: linear-gradient(135deg, #8b5cf6, #ec4899); background-size: 200% auto; animation: shimmer 3s linear infinite;">
                     ${icon("qr_code_2", 28)}<br><b style="font-size:15px; margin-top:4px;">QRIS</b>
                 </button>
-                <button class="btn btn-ghost" type="button" id="pickCash" style="flex-direction:column; padding:14px; height:auto; border-radius: 8px;">
+                <button class="btn btn-save" type="button" id="pickCash" style="flex-direction:column; padding:14px 10px; height:auto; border-radius: 8px; background: linear-gradient(135deg, #10b981, #3b82f6); background-size: 200% auto; animation: shimmer 3s linear infinite;">
                     ${icon("payments", 28)}<br><b style="font-size:15px; margin-top:4px;">CASH</b>
                 </button>
             </div>`;
         } else if (ui.payMethod === "QRIS") {
             body += `<div class="kv total"><span>Total Tagihan</span><b>${rupiah(total)}</b></div>
-            <div class="kv"><span>Minimal DP (${ST.dpPercent}%)</span><b>${rupiah(d)}</b></div>
-            <div class="row-btns" style="margin-bottom:16px; gap:8px; justify-content:center;">
-                <button class="btn btn-sm ${ui.payType === 'DP_MIN' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="DP_MIN">DP Minimal</button>
+            <div class="row-btns" style="margin-top:16px; margin-bottom:8px; gap:8px; justify-content:center;">
+                <button class="btn btn-sm ${ui.payType === 'DP_MIN' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="DP_MIN">DP</button>
                 <button class="btn btn-sm ${ui.payType === 'DP_MANUAL' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="DP_MANUAL">DP Manual</button>
                 <button class="btn btn-sm ${ui.payType === 'LUNAS' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="LUNAS">Lunas</button>
             </div>
+            <p class="muted center" style="margin-bottom:16px; font-size:12px">Minimal DP: ${rupiah(d)} (${ST.dpPercent}%)</p>
             ${ui.payType === 'DP_MANUAL' ? `
                 <div class="form-group" style="margin-bottom:8px;">
                     <label>Nominal DP (Rp)</label>
@@ -394,12 +394,12 @@ function renderDetail(secret, b, fresh, ui, draw) {
             body += `<button class="btn btn-ghost btn-sm" type="button" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
         } else if (ui.payMethod === "CASH") {
             body += `<div class="kv total"><span>Total Tagihan</span><b>${rupiah(total)}</b></div>
-            <div class="kv"><span>Minimal DP (${ST.dpPercent}%)</span><b>${rupiah(d)}</b></div>
-            <p class="muted center">Silakan pilih Anda mau bayar DP atau Lunas di kasir. Admin akan mengonfirmasi nominal yang Anda bayarkan.</p>
-            <div class="row-btns" style="margin-bottom:16px; gap:8px; justify-content:center;">
-                <button class="btn btn-sm ${ui.payType === 'DP_MIN' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="DP_MIN">DP Minimal</button>
+            <p class="muted center" style="margin-top:12px">Silakan pilih Anda mau bayar DP atau Lunas di kasir. Admin akan mengonfirmasi nominal yang Anda bayarkan.</p>
+            <div class="row-btns" style="margin-top:16px; margin-bottom:8px; gap:8px; justify-content:center;">
+                <button class="btn btn-sm ${ui.payType === 'DP_MIN' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="DP_MIN">DP</button>
                 <button class="btn btn-sm ${ui.payType === 'LUNAS' ? 'btn-save' : 'btn-ghost'}" type="button" data-pt="LUNAS">Lunas</button>
             </div>
+            <p class="muted center" style="margin-bottom:16px; font-size:12px">Minimal DP: ${rupiah(d)} (${ST.dpPercent}%)</p>
             <div class="pay-amount"><small>Nominal Tagihan</small><div class="nominal">${rupiah(finalAmount)}</div></div>
             <button class="btn btn-save btn-block" type="button" id="paidCashBtn">${icon("storefront")} Konfirmasi Bayar Cash</button>
             <button class="btn btn-ghost btn-sm" type="button" id="backMethod" style="margin-top:12px;">Ganti Metode</button>`;
@@ -434,8 +434,8 @@ function renderDetail(secret, b, fresh, ui, draw) {
     if (eff === "DIBATALKAN") body += `<div class="panel"><h3>${icon("block")} Booking dibatalkan</h3></div>`;
     if (b.payNote && eff === "MENUNGGU_BAYAR") body += `<div class="banner warn">${icon("report")}<span>Catatan admin: ${esc(b.payNote)}</span></div>`;
 
-    const method = b.dpMethod === "CASH" ? "Cash" : b.dpMethod === "QRIS" ? "QRIS" : "-";
-    const money = b.total ? `<div class="kv"><span>Total</span><b>${rupiah(b.total)}</b></div><div class="kv"><span>Metode DP</span><b>${method}</b></div><div class="kv"><span>DP${b.dpMethod === "CASH" ? " (Cash)" : ""}</span><b>${rupiah(b.dpDue)}</b></div>${b.dpPaid ? `<div class="kv"><span>${b.dpPaid >= (b.total || 0) ? 'Lunas' : 'DP diterima'}</span><b class="okc">${rupiah(b.dpPaid)}</b></div>` : ""}` : b.estTotal ? `<div class="kv"><span>Estimasi total</span><b>${rupiah(b.estTotal)}</b></div>` : "";
+    const method = b.dpMethod === "CASH" ? "CASH" : b.dpMethod === "QRIS" ? "QRIS" : "-";
+    const money = b.total ? `<div class="kv"><span>Total</span><b>${rupiah(b.total)}</b></div><div class="kv"><span>Metode</span><b>${method}</b></div>${b.dpPaid ? `<div class="kv"><span>${b.dpPaid >= (b.total || 0) ? 'Lunas' : 'DP diterima'}</span><b class="okc">${rupiah(b.dpPaid)}</b></div>` : ""}` : b.estTotal ? `<div class="kv"><span>Estimasi total</span><b>${rupiah(b.estTotal)}</b></div>` : "";
     const canCancel = ["PENDING", "MENUNGGU_BAYAR"].includes(eff);
 
     view.innerHTML = `<div class="detail-head"><a href="#/" class="btn btn-ghost btn-sm">${icon("arrow_back", 16)} Beranda</a>${pill(eff)}</div>
@@ -605,7 +605,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
         $("#paidCashBtn")?.addEventListener("click", async e => {
             const btn = e.currentTarget;
             const amtToPay = ui.payType === 'LUNAS' ? total : d;
-            if (!await confirmBox("Konfirmasi Bayar Cash?", "Pastikan Anda sudah membayar di kasir sebelum menekan tombol ini.", "Ya, Konfirmasi")) return;
+            if (!await confirmBox("Konfirmasi Metode Cash?", "Sistem akan mencatat bahwa Anda memilih pembayaran CASH. Pastikan Anda membayar di kasir sebelum jam mulai bermain.", "Ya, Konfirmasi")) return;
             setBusy(btn, true, "Memproses…");
             try {
                 const batch = writeBatch(db);

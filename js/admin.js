@@ -220,7 +220,7 @@ function cardHTML(b, i = 0) {
         let info = "";
         if (b.dpPaid) info = `<b class="okc">✔ Diterima ${rupiah(b.dpPaid)} (${b.dpPaidMethod || b.dpMethod || "CASH"})</b>`;
         else if (b.payAmount) {
-            const typeStr = b.paymentType === "LUNAS" ? "Lunas" : b.paymentType === "DP_MANUAL" ? "DP Manual" : "DP Min";
+            const typeStr = b.paymentType === "LUNAS" ? "Lunas" : b.paymentType === "DP_MANUAL" ? "DP Manual" : "DP";
             info = `(Klaim: ${typeStr} ${rupiah(b.payAmount)} via ${b.dpMethod || "QRIS"})`;
         }
         money = `<div class="detail-item price-tag">${icon("payments", 16)}<span class="val">Total ${rupiah(b.total)} · DP ${rupiah(b.dpDue)} ${info}</span></div>`;
@@ -405,8 +405,13 @@ async function verifyModal(b) {
     
     const isCash = b.dpMethod === "CASH";
     const method = isCash ? "CASH" : "QRIS";
-    const tipe = b.paymentType === "LUNAS" ? "Lunas" : b.paymentType === "DP_MANUAL" ? "DP Manual" : "DP Minimal";
+    const tipe = b.paymentType === "LUNAS" ? "Lunas" : b.paymentType === "DP_MANUAL" ? "DP Manual" : "DP";
     const nominal = b.payAmount || b.dpDue || 0;
+    
+    const receivedAmount = b.paymentType === "LUNAS" ? (b.total || nominal) : nominal;
+    const receivedLabel = isCash ? (b.paymentType === "LUNAS" ? "Nominal yang harusnya diterima:" : "Nominal minimal yang harusnya diterima:") : "Cari di mutasi / notifikasi merchant QRIS:";
+    const receivedNote = !isCash ? "Nominal harus PERSIS sama." : (b.paymentType === "LUNAS" ? "Pastikan sesuai." : "Pelanggan bisa membayar lebih dari nominal minimal ini.");
+    
     const btnNoText = isCash ? "Belum diterima" : "Belum masuk";
     const btnOkText = isCash ? "Sudah diterima" : "Sudah masuk";
 
@@ -414,9 +419,9 @@ async function verifyModal(b) {
       <div class="kv"><span>User Klaim Bayar</span><b>${tipe} - ${rupiah(nominal)}</b></div>
       <div class="kv"><span>Metode</span><b>${method}</b></div>
       <div class="banner ok" style="flex-direction:column;gap:4px; margin-top:12px;">
-        <span>${isCash ? 'Nominal yang harusnya diterima:' : 'Cari di mutasi / notifikasi merchant QRIS:'}</span>
-        <b style="font-size:24px;font-family:Orbitron">${rupiah(nominal)}</b>
-        <span class="muted">${!isCash ? 'Nominal harus PERSIS sama.' : ''} Dilaporkan ${b.paidReportedAt ? esc(fmtDT(b.paidReportedAt)) : "-"}${b.sender ? " · pengirim: " + esc(b.sender) : ""}</span>
+        <span>${receivedLabel}</span>
+        <b style="font-size:24px;font-family:Orbitron">${rupiah(receivedAmount)}</b>
+        <span class="muted">${receivedNote} Dilaporkan ${b.paidReportedAt ? esc(fmtDT(b.paidReportedAt)) : "-"}${b.sender ? " · pengirim: " + esc(b.sender) : ""}</span>
       </div>
       ${!isCash ? (img ? `
         <img class="proof-img" src="${img}" alt="bukti">
@@ -425,7 +430,7 @@ async function verifyModal(b) {
                 ${icon("download", 16)} Unduh Foto
             </a>
         </div>
-      ` : `<p class="muted center">Tidak ada screenshot terlampir. Cocokkan langsung di mutasi.</p>`) : `<p class="muted center">Pastikan uang Cash sudah diterima di kasir sejumlah nominal di atas.</p>`}
+      ` : `<p class="muted center">Tidak ada screenshot terlampir. Cocokkan langsung di mutasi.</p>`) : `<p class="muted center">Pastikan uang CASH sudah diterima di kasir setidaknya sejumlah nominal di atas.</p>`}
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Tutup</button><button class="btn btn-delete" id="vNo">${btnNoText}</button><button class="btn btn-ok" id="vOk">${icon("check", 16)} ${btnOkText}</button></div>`);
     
     $("#vOk", m.el).onclick = async () => {
@@ -443,7 +448,7 @@ function receiveModal(b) {
     const m = modal(`<h3>${icon("payments")} Verifikasi Pembayaran Cash</h3><p>${esc(b.nama)} · Total ${rupiah(b.total)} / DP Minimal ${rupiah(b.dpDue)}</p>
       <div class="form-grid">
         <div class="form-group"><label>Nominal diterima</label><input id="dNom" data-money inputmode="numeric" value="${fmtNum(b.dpDue)}"></div>
-        <div class="form-group"><label>Metode</label><select id="dMet"><option value="CASH">Cash</option><option value="QRIS">QRIS / Transfer</option></select></div>
+        <div class="form-group"><label>Metode</label><select id="dMet"><option value="CASH">CASH</option><option value="QRIS">QRIS / Transfer</option></select></div>
       </div>
       <div class="modal-actions"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-ok" id="dGo">Konfirmasi</button></div>`);
     $("#dGo", m.el).onclick = async () => {
@@ -509,8 +514,8 @@ function detailModal(b) {
         </div>`;
     }
 
-    const method = b.dpMethod === "CASH" ? "Cash" : b.dpMethod === "QRIS" ? "QRIS" : "-";
-    let payTypeStr = b.paymentType === "LUNAS" ? "Lunas" : b.paymentType === "DP_MANUAL" ? "DP Manual" : b.paymentType === "DP_MIN" ? "DP Minimal" : "-";
+    const method = b.dpMethod === "CASH" ? "CASH" : b.dpMethod === "QRIS" ? "QRIS" : "-";
+    let payTypeStr = b.paymentType === "LUNAS" ? "Lunas" : b.paymentType === "DP_MANUAL" ? "DP Manual" : b.paymentType === "DP_MIN" ? "DP" : "-";
     
     let payInfo = "";
     if (b.payAmount) {
