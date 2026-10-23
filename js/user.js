@@ -481,20 +481,28 @@ function renderDetail(secret, b, fresh, ui, draw) {
             ui.manualAmount = parseNum(e.target.value);
             const warn = $("#dpWarn");
             const btn = $("#btnGenQr");
-            if (warn) {
-                if (ui.manualAmount > 0 && ui.manualAmount < d) {
-                    warn.textContent = `Minimal DP adalah ${rupiah(d)}`;
-                    warn.style.display = 'block';
-                    if (btn) btn.disabled = true;
-                } else if (ui.manualAmount > total) {
-                    warn.textContent = `Maksimal adalah ${rupiah(total)} (Lunas)`;
-                    warn.style.display = 'block';
-                    if (btn) btn.disabled = true;
+            
+            let isError = false;
+            if (ui.manualAmount > 0 && ui.manualAmount < d) {
+                warn.textContent = `Minimal DP adalah ${rupiah(d)}`;
+                warn.style.display = 'block';
+                isError = true;
+            } else if (ui.manualAmount > total) {
+                warn.textContent = `Maksimal adalah ${rupiah(total)} (Lunas)`;
+                warn.style.display = 'block';
+                isError = true;
+            } else {
+                warn.style.display = 'none';
+            }
+
+            if (btn) {
+                if (isError || ui.manualAmount === 0) {
+                    btn.setAttribute("disabled", "disabled");
                 } else {
-                    warn.style.display = 'none';
-                    if (btn) btn.disabled = false;
+                    btn.removeAttribute("disabled");
                 }
             }
+
             if (ui.qrGenerated && ui.qrAmount !== ui.manualAmount) {
                 const warnBox = $("#payQrBox")?.previousElementSibling;
                 if (warnBox && warnBox.classList.contains("banner")) {
