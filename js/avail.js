@@ -34,7 +34,7 @@ export async function checkFree(lok, room, s, e, bufMs, fresh) {
     return conflictsIn(all, s, e, bufMs).length === 0;
 }
 
-export async function applyTx({ remove = [], add = null, bufMs = 0, alive, bookingRef = null, bookingData = null, bookingCreate = false, force = false }) {
+export async function applyTx({ remove = [], add = null, bufMs = 0, alive, bookingRef = null, bookingData = null, bookingCreate = false }) {
     const refs = new Map();
     const need = (lok, room, s, e, buf) => datesTouched(s, e, buf).forEach(d => refs.set(availId(lok, room, d), { lok, room, date: d }));
     remove.forEach(r => need(r.lokasi, r.room, r.s, r.e, 0));
@@ -44,7 +44,7 @@ export async function applyTx({ remove = [], add = null, bufMs = 0, alive, booki
     return runTransaction(db, async tx => {
         const data = new Map();
         for (const [id] of refs) { const s = await tx.get(doc(db, "availability", id)); data.set(id, s.exists() ? (s.data().ranges || []) : []); }
-        if (add && !force) {
+        if (add) {
             for (const [, ranges] of data) {
                 const c = conflictsIn(ranges, add.s, add.e, bufMs, t, alive, add.bid);
                 if (c.length) { const err = new Error("SLOT_BENTROK"); err.conflicts = c; throw err; }

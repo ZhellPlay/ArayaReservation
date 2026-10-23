@@ -411,7 +411,6 @@ async function verifyModal(b) {
     const receivedAmount = b.paymentType === "LUNAS" ? (b.total || nominal) : nominal;
     const receivedLabel = isCash ? (b.paymentType === "LUNAS" ? "Nominal yang harusnya diterima:" : "Nominal minimal yang harusnya diterima:") : "User klaim transfer sebesar:";
     
-    // Kalimat yang sudah disesuaikan
     const receivedNote = !isCash 
         ? "PENTING: Cek detail bukti pembayaran (nama, no rek, nominal, dll). Pastikan tidak ada indikasi manipulasi dan pastikan bukti transfer asli." 
         : (b.paymentType === "LUNAS" ? "Pastikan sesuai." : "Pelanggan bisa membayar lebih dari nominal minimal ini.");
@@ -598,10 +597,11 @@ function editModal(b) {
     $("#eLok", m.el).onchange = fill;
     ["eRoom", "eDur", "eOrg", "eMic"].forEach(id => $("#" + id, m.el).addEventListener("input", recalc));
 
-    $("#eGo", m.el).onclick = async () => {
+    $("#eGo", m.el).onclick = async e => {
+        const btn = e.currentTarget;
         const s = fromDateTimeInput($("#eDt", m.el).value), dur = parseFloat($("#eDur", m.el).value);
         if (!s || !(dur > 0)) return toast("Waktu / durasi tidak valid", "error");
-        const e = s + Math.round(dur * H), patch = {
+        const e2 = s + Math.round(dur * H), patch = {
             nama: $("#eNama", m.el).value.trim() || b.nama,
             wa: normWA($("#eWa", m.el).value),
             lokasi: $("#eLok", m.el).value,
@@ -610,7 +610,7 @@ function editModal(b) {
             jamMulai: witaTime(s),
             durasi: dur,
             startMs: s,
-            endMs: e,
+            endMs: e2,
             orang: parseInt($("#eOrg", m.el).value) || 1,
             mic: parseInt($("#eMic", m.el).value) || 0,
             catatan: $("#eCat", m.el).value.trim(),
@@ -624,12 +624,15 @@ function editModal(b) {
             }
         }
         const nb = { ...b, ...patch };
+        
+        setBusy(btn, true, "Menyimpan…");
         const ok = await run(async () => {
             if (b.slot && isOpen(b.status)) await applyTx({ remove: [rangeOf(b)], add: addOf(nb), bufMs: bufMs(), alive, bookingRef: refOf(b), bookingData: patch });
             else await updateDoc(refOf(b), patch);
             if (patch.wa && patch.wa !== b.wa && b.kode) await setDoc(doc(db, "lookups", await lookupId(b.kode, patch.wa)), { s: b.id });
         }, "Perubahan disimpan");
-        if (ok) m.close();
+        
+        if (ok) m.close(); else setBusy(btn, false);
     };
 }
 
@@ -642,7 +645,6 @@ function manualModal(pre = {}) {
       <div class="form-group full-width"><label id="mNamaL">Nama</label><input id="mNama" placeholder="Nama / label"></div>
       <div class="form-group" data-m="u"><label>WhatsApp</label><input id="mWa" inputmode="tel"></div><div class="form-group" data-m="u"><label>Orang</label><input type="number" id="mOrg" value="2" min="1"></div>
       <div class="form-group" data-m="u"><label>Total (opsional)</label><input id="mTot" data-money inputmode="numeric"></div><div class="form-group" data-m="u"><label>DP diterima</label><input id="mDp" data-money inputmode="numeric" placeholder="0"></div></div>
-      <label class="check" style="margin-top:12px"><input type="checkbox" id="mForce"><span>Paksa walau bentrok <small class="muted">(kenyataan di lapangan menang; booking yang bentrok akan ditandai)</small></span></label>
       <div class="modal-actions" style="margin-top:20px"><button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-save" id="mGo" style="flex:0 0 auto;padding:12px 22px">Simpan</button></div>`);
     const fill = () => { $("#mRoom", m.el).innerHTML = (S.st.rooms[$("#mLok", m.el).value] || []).map(r => `<option ${r.name === pre.room ? "selected" : ""}>${esc(r.name)}</option>`).join(""); };
     const sync = () => { const t = $("#mTipe", m.el).value; $$("[data-m=u]", m.el).forEach(x => x.style.display = t === "BLOK" ? "none" : ""); $("#mNamaL", m.el).textContent = t === "BLOK" ? "Alasan blokir" : "Nama"; if (t === "WALKIN") $("#mDt", m.el).value = witaDateTimeInput(now()); };
@@ -666,7 +668,7 @@ function manualModal(pre = {}) {
         const add = { lokasi, room, s, e: en, bid, k: t === "WALKIN" ? "walkin" : t === "BLOK" ? "block" : "booked" }; data.slotKind = add.k;
         setBusy(btn, true, "Menyimpan…");
         const ok = await run(async () => {
-            await applyTx({ add, bufMs: bufMs(), alive, bookingRef: doc(db, "bookings", secret), bookingData: data, bookingCreate: true, force: $("#mForce", m.el).checked });
+            await applyTx({ add, bufMs: bufMs(), alive, bookingRef: doc(db, "bookings", secret), bookingData: data, bookingCreate: true });
             if (wa && t !== "BLOK") await setDoc(doc(db, "lookups", await lookupId(kode, wa)), { s: secret });
         }, "Tersimpan");
         if (ok) m.close(); else setBusy(btn, false);
