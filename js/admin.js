@@ -5,7 +5,7 @@ import {
 import {
     $, $$, esc, toast, modal, confirmBox, promptBox, setBusy, copyText, icon, rupiah, fmtNum, parseNum, normWA, randSecret, genKode, lookupId, normKode,
     witaDate, witaTime, witaDateTimeInput, fromDateTimeInput, addDays, fmtDate, fmtDT, tsMs, now, syncClock, STATUS, HOLDING, pill, effStatus, getEndMs,
-    mergeSettings, roomCfg, calcPrice, fillTpl, waLink, bookingLink, siteLink, startBackground
+    mergeSettings, roomCfg, calcPrice, fillTpl, waLink, bookingLink, siteLink, startBackground, isHoliday
 } from "./lib.js";
 import { applyTx } from "./avail.js";
 import { renderSettings } from "./admin-settings.js";
@@ -300,9 +300,17 @@ async function run(fn, ok) {
     }
 }
 
-function conflictModal(cs) {
-    const rows = cs.map(r => { const o = S.byBid.get(r.bid); return `<li>${esc(fmtDT(r.s))}–${esc(witaTime(r.e))} · ${esc(r.k)}${o ? " · " + esc(o.nama) : ""}</li>`; }).join("");
-    modal(`<div class="modal-icon"><span class="material-icons-round">warning</span></div><h3>Slot sudah terisi</h3><p>Tidak bisa diproses karena bentrok dengan:</p><ul style="margin:8px 0 16px 0; padding:0; text-align:center; list-style-position:inside; line-height:1.6;">${rows}</ul><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`, { wide: false });
+function conflictModal(cs = []) {
+    try {
+        const rows = cs.map(r => { 
+            const o = S.byBid.get(r.bid); 
+            const name = o ? o.nama : "Booking lain";
+            return `<li>${esc(fmtDT(r.s))}–${esc(witaTime(r.e))} · ${esc(r.k)} · ${esc(name)}</li>`; 
+        }).join("");
+        modal(`<div class="modal-icon"><span class="material-icons-round">warning</span></div><h3>Slot sudah terisi</h3><p>Tidak bisa diproses karena bentrok dengan:</p><ul style="margin:8px 0 16px 0; padding:0; text-align:center; list-style-position:inside; line-height:1.6;">${rows || '<li>Jadwal lain</li>'}</ul><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`, { wide: false });
+    } catch (err) {
+        toast("Slot bentrok dengan jadwal lain. Silakan ganti waktu.", "error");
+    }
 }
 
 const changeStatus = (b, patch, { release = false, add = null } = {}) => {
@@ -599,62 +607,77 @@ function editModal(b) {
 
     $("#eGo", m.el).onclick = async e => {
         const btn = e.currentTarget;
-        const s = fromDateTimeInput($("#eDt", m.el).value), dur = parseFloat($("#eDur", m.el).value);
-        if (!s || !(dur > 0)) return toast("Waktu / durasi tidak valid", "error");
-        const e2 = s + Math.round(dur * H), patch = {
-            nama: $("#eNama", m.el).value.trim() || b.nama,
-            wa: normWA($("#eWa", m.el).value),
-            lokasi: $("#eLok", m.el).value,
-            room: $("#eRoom", m.el).value,
-            tanggal: witaDate(s),
-            jamMulai: witaTime(s),
-            durasi: dur,
-            startMs: s,
-            endMs: e2,
-            orang: parseInt($("#eOrg", m.el).value) || 1,
-            mic: parseInt($("#eMic", m.el).value) || 0,
-            catatan: $("#eCat", m.el).value.trim(),
-            upd: serverTimestamp()
-        };
+        try {
+            const s = fromDateTimeInput($("#eDt", m.el).value), dur = parseFloat($("#eDur", m.el).value);
+            if (!s || !(dur > 0)) return toast("Waktu / durasi tidak valid", "error");
+            const e2 = s + Math.round(dur * H), patch = {
+                nama: $("#eNama", m.el).value.trim() || b.nama,
+                wa: normWA($("#eWa", m.el).value),
+                lokasi: $("#eLok", m.el).value,
+                room: $("#eRoom", m.el).value,
+                tanggal: witaDate(s),
+                jamMulai: witaTime(s),
+                durasi: dur,
+                startMs: s,
+                endMs: e2,
+                orang: parseInt($("#eOrg", m.el).value) || 1,
+                mic: parseInt($("#eMic", m.el).value) || 0,
+                catatan: $("#eCat", m.el).value.trim(),
+                upd: serverTimestamp()
+            };
 
-        // 1. VALIDASI HARI LIBUR (Tampilkan Modal Peringatan)
-        const hol = isHoliday(S.st, patch.lokasi, patch.tanggal);
-        if (hol) {
-            modal(`<div class="modal-icon"><span class="material-icons-round">event_busy</span></div><h3>Tanggal Libur</h3><p>Di tanggal tersebut tutup karena <b>${esc(hol.alasan || "ada acara")}</b>. Mohon pilih tanggal lain.</p><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`, { wide: false });
-            return; // Hentikan proses, modal edit tetap terbuka
-        }
-
-        // 2. VALIDASI BENTROK (Tampilkan Modal Peringatan)
-        const clash = S.bookings.find(o => 
-            o.id !== b.id && 
-            o.lokasi === patch.lokasi && 
-            o.room === patch.room && 
-            ["MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN", "MENUNGGU_BAYAR"].includes(o.status) &&
-            patch.startMs < o.endMs && patch.endMs > o.startMs
-        );
-
-        if (clash) {
-            modal(`<div class="modal-icon"><span class="material-icons-round">warning</span></div><h3>Slot sudah terisi</h3><p>Tidak bisa menyimpan. Slot bentrok dengan booking <b>${esc(clash.nama)}</b> (${esc(clash.jamMulai)} - ${esc(witaTime(clash.endMs))}).</p><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`, { wide: false });
-            return; // Hentikan proses, modal edit tetap terbuka
-        }
-
-        if (!b.tipe || b.tipe === "ONLINE") {
-            if (b.status === "PENDING") patch.estTotal = m_tot;
-            else {
-                patch.total = m_tot;
-                patch.dpDue = m_dp;
+            // 1. VALIDASI HARI LIBUR
+            const hol = isHoliday(S.st, patch.lokasi, patch.tanggal);
+            if (hol) {
+                try {
+                    modal(`<div class="modal-icon"><span class="material-icons-round">event_busy</span></div><h3>Tanggal Libur</h3><p>Di tanggal tersebut tutup karena <b>${esc(hol.alasan || "ada acara")}</b>. Mohon pilih tanggal lain.</p><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`, { wide: false });
+                } catch (err) {
+                    toast(`Tutup pada tanggal tersebut (${hol.alasan || "Libur"}). Pilih tanggal lain.`, "error");
+                }
+                return;
             }
+
+            // 2. VALIDASI BENTROK (Waktu)
+            const buf = bufMs();
+            const clash = S.bookings.find(o => 
+                o.id !== b.id && 
+                o.lokasi === patch.lokasi && 
+                o.room === patch.room && 
+                ["MENUNGGU_VERIFIKASI", "TERKONFIRMASI", "CHECKED_IN", "MENUNGGU_BAYAR"].includes(eff(o)) &&
+                patch.startMs < o.endMs + buf && patch.endMs > o.startMs - buf
+            );
+
+            if (clash) {
+                try {
+                    modal(`<div class="modal-icon"><span class="material-icons-round">warning</span></div><h3>Slot sudah terisi</h3><p>Tidak bisa menyimpan. Slot bentrok dengan booking <b>${esc(clash.nama)}</b> (${esc(clash.jamMulai)} - ${esc(witaTime(clash.endMs))}).</p><div class="modal-actions"><button class="btn btn-ghost" data-close>Mengerti</button></div>`, { wide: false });
+                } catch (err) {
+                    toast(`Slot bentrok dengan booking ${clash.nama}. Ganti waktu lain.`, "error");
+                }
+                return;
+            }
+
+            if (!b.tipe || b.tipe === "ONLINE") {
+                if (b.status === "PENDING") patch.estTotal = m_tot;
+                else {
+                    patch.total = m_tot;
+                    patch.dpDue = m_dp;
+                }
+            }
+            const nb = { ...b, ...patch };
+            
+            setBusy(btn, true, "Menyimpan…");
+            const ok = await run(async () => {
+                if (b.slot && isOpen(b.status)) await applyTx({ remove: [rangeOf(b)], add: addOf(nb), bufMs: bufMs(), alive, bookingRef: refOf(b), bookingData: patch });
+                else await updateDoc(refOf(b), patch);
+                if (patch.wa && patch.wa !== b.wa && b.kode) await setDoc(doc(db, "lookups", await lookupId(b.kode, patch.wa)), { s: b.id });
+            }, "Perubahan disimpan");
+            
+            if (ok) m.close(); else setBusy(btn, false);
+        } catch (err) {
+            console.error(err);
+            toast("Terjadi kesalahan sistem: " + (err.message || err), "error");
+            setBusy(btn, false);
         }
-        const nb = { ...b, ...patch };
-        
-        setBusy(btn, true, "Menyimpan…");
-        const ok = await run(async () => {
-            if (b.slot && isOpen(b.status)) await applyTx({ remove: [rangeOf(b)], add: addOf(nb), bufMs: bufMs(), alive, bookingRef: refOf(b), bookingData: patch });
-            else await updateDoc(refOf(b), patch);
-            if (patch.wa && patch.wa !== b.wa && b.kode) await setDoc(doc(db, "lookups", await lookupId(b.kode, patch.wa)), { s: b.id });
-        }, "Perubahan disimpan");
-        
-        if (ok) m.close(); else setBusy(btn, false);
     };
 }
 
