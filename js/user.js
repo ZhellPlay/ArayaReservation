@@ -361,14 +361,24 @@ function renderDetail(secret, b, fresh, ui, draw) {
             } else {
                 body += `<div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(displayAmount)}</div></div>`;
                 
-                const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "";
-                if (q && q.payload && isQrValid) { try { qr = qrSvg(makeDynamic(q.payload, displayAmount)); } catch (e) { qr = ""; } }
+                const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "", errMsg = "";
+                if (!q || !q.payload) {
+                    errMsg = "Admin belum mengunggah QRIS untuk cabang ini.";
+                } else if (!isQrValid) {
+                    errMsg = "Nominal tidak valid.";
+                } else {
+                    try { qr = qrSvg(makeDynamic(q.payload, displayAmount)); } 
+                    catch (e) { 
+                        console.error("QRIS Error:", e);
+                        errMsg = "Format QRIS error, hubungi admin."; 
+                    }
+                }
                 
                 body += `${qr ? `<div class="qr-box" id="payQrBox">${qr}</div>
                   <div class="row-btns" style="justify-content:center">
                     <button class="btn btn-ghost" type="button" id="dlQr">${icon("download", 16)} Unduh QR</button>
                   </div>
-                  <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>QRIS belum tersedia atau nominal tidak valid. Hubungi admin untuk cara bayar.</span></div>`}
+                  <p class="center muted">${esc(q.merchant || "ARAYA GAMESTATION")}</p>` : `<div class="banner warn">${icon("info")}<span>${errMsg || "QRIS belum tersedia."}</span></div>`}
                   <div class="proof"><label>Bukti pembayaran <small class="muted">(Wajib berupa screenshot)</small></label><input type="file" id="proofFile" accept="image/*"><img id="proofPrev" class="proof-prev" ${ui.proof ? "" : "hidden"} src="${ui.proof || ""}">
                   <label>Nama pengirim / e-wallet <small class="muted">(opsional)</small></label><input id="sender" maxlength="40" placeholder="Nama di e-wallet / rekening" value="${ui.sender || ""}">
                   <button class="btn btn-save btn-block" type="button" id="paidBtn">${icon("task_alt")} Saya Sudah Bayar</button>
