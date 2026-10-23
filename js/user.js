@@ -264,14 +264,7 @@ function viewDetail(secret) {
     let last = null, fresh = sessionStorage.getItem("araya_new") === secret;
     const ui = { proof: null, sender: "", payMethod: null, payType: "DP_MIN", manualAmount: 0, qrGenerated: false, qrAmount: 0 };
     lastStatus = null;
-    const draw = () => { 
-        try { 
-            if (last) renderDetail(secret, last, fresh, ui, draw); 
-        } catch(err) { 
-            console.error("Render Error:", err); 
-            toast("Gagal merender tampilan", "error");
-        } 
-    };
+    const draw = () => { if (last) renderDetail(secret, last, fresh, ui, draw); };
 
     unsub = onSnapshot(doc(db, "bookings", secret), s => {
         if (!s.exists()) { view.innerHTML = `<div class="panel center"><span class="material-icons-round big">link_off</span><h3>Booking tidak ditemukan</h3><p class="muted">Link salah, atau booking sudah dihapus admin.</p><p><a class="btn btn-ghost" href="#/find">Cari pakai kode</a> <a class="btn btn-ghost" href="#/">Beranda</a></p></div>`; forget(secret); return; }
@@ -346,7 +339,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
                         ${ui.manualAmount > 0 && ui.manualAmount < d ? `Minimal DP adalah ${rupiah(d)}` : ui.manualAmount > total ? `Maksimal adalah ${rupiah(total)} (Lunas)` : ''}
                     </small>
                 </div>
-                <button class="btn btn-ghost btn-block" type="button" id="btnGenQr" style="margin-bottom:16px; position: relative; z-index: 10;">${icon("qr_code_2")} Tampilkan QRIS</button>
+                <button class="btn btn-ghost btn-block" type="button" id="btnGenQr" style="margin-bottom:16px;">${icon("qr_code_2")} Tampilkan QRIS</button>
             ` : ''}
             `;
 
@@ -364,8 +357,7 @@ function renderDetail(secret, b, fresh, ui, draw) {
             const isQrValid = displayAmount >= d && displayAmount <= total;
 
             if (!ui.qrGenerated && ui.payType === 'DP_MANUAL') {
-                // Do nothing, the banner above handles it
-            } else {
+                            } else {
                 body += `<div class="pay-amount"><small>Transfer sebesar</small><div class="nominal" id="nominal">${rupiah(displayAmount)}</div></div>`;
                 
                 const q = QRC[b.lokasi] || QRC.DEFAULT; let qr = "", errMsg = "";
@@ -516,20 +508,15 @@ function renderDetail(secret, b, fresh, ui, draw) {
             }
         });
 
-        const btnGen = $("#btnGenQr");
-        if (btnGen) {
-            btnGen.onclick = (e) => {
-                e.preventDefault();
-                const val = parseNum($("#manualDp").value);
-                if (val < d) return toast(`Minimal DP adalah ${rupiah(d)}`, "error");
-                if (val > total) return toast(`Maksimal adalah ${rupiah(total)}`, "error");
-                
-                ui.qrGenerated = true;
-                ui.qrAmount = val;
-                draw();
-                setTimeout(() => document.querySelector("#payQrBox")?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-            };
-        }
+        $("#btnGenQr")?.addEventListener("click", () => {
+            const val = parseNum($("#manualDp").value);
+            if (val < d) return toast(`Minimal DP adalah ${rupiah(d)}`, "error");
+            if (val > total) return toast(`Maksimal adalah ${rupiah(total)}`, "error");
+            ui.qrGenerated = true;
+            ui.qrAmount = val;
+            draw();
+            setTimeout(() => document.querySelector("#payQrBox")?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+        });
 
         $("#proofFile")?.addEventListener("change", async e => {
             const f = e.target.files[0]; if (!f) return;
